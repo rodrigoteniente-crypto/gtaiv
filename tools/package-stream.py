@@ -33,7 +33,7 @@ for name in ("README.md", ".gitignore", "docs/STREAM-INSTALACION.md", "docs/STRE
 for name, path in entries.items():
     if not path.is_file():
         raise SystemExit(f"Falta {path}; compilar antes de empaquetar")
-output = ROOT / "dist/KickChaos-IV-1.9.1-stream.zip"
+output = ROOT / "dist/KickChaos-IV-1.9.2-camera.zip"
 output.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     hashes = []

@@ -1,9 +1,16 @@
-# KickChaos IV 1.9.1 stream
+# KickChaos IV 1.9.2 camera
 
 Mod de GTA IV Complete Edition para el aCompleteEditionHook y ScriptHookDotNet
 proporcionados por el usuario. Reutiliza el código completo del ZIP 1.9.0:
 cámaras/editor/FOV, chat, NPCs, mejoras, ranking, radio y eventos. La versión
 nueva está en `stream/`; `src/` conserva la entrega 1.6.3 para recuperación.
+
+La 1.9.2 corrige la regresión del seguimiento de NPCs de la 1.9.1. El log
+recibido confirma que el personaje aparece y conduce; la cámara había perdido
+la comprobación del terreno. Ahora usa seguimiento manual cercano por defecto,
+valida cada posición antes de aplicarla y vuelve a ciudad si no encuentra una
+toma válida. Mantiene la carga de la ciudad alrededor del NPC y registra las
+coordenadas del personaje y la cámara para diagnosticar la prueba en el juego.
 
 ## Cambios
 
@@ -22,8 +29,8 @@ nueva está en `stream/`; `src/` conserva la entrega 1.6.3 para recuperación.
   de probabilidad, visita de diez segundos y cooldown de 120. Después retorna
   exactamente al plano anterior con su tiempo restante. F4 fija un NPC, F6
   vuelve a ciudad. Donaciones de 100 Kicks equivalen a diez segundos, con
-  límites configurables. Cámara de seguimiento con colisión nativa y rechazo
-  de posiciones imposibles bajo puentes/túneles.
+  límites configurables. Seguimiento manual con FOV configurable, comprobación
+  del terreno local y recuperación de tomas inválidas, incluso con un NPC fijado.
 - HUD compacto con stats, builds, cooldown de `!npc`, nuevo suscriptor y feed.
   F1 oculta el HUD; F2 cambia el feed. Minimapa con cono del FOV, colores por
   tipo y marcadores de carreras/convoyes.
@@ -45,11 +52,15 @@ nueva está en `stream/`; `src/` conserva la entrega 1.6.3 para recuperación.
 
 ## Instalación
 
-[Descargar ZIP compilado](https://github.com/rodrigoteniente-crypto/gtaiv/raw/refs/heads/kickchaos-stream-1.9.1/dist/KickChaos-IV-1.9.1-stream.zip).
+[Descargar ZIP compilado](https://github.com/rodrigoteniente-crypto/gtaiv/raw/refs/heads/kickchaos-camera-1.9.2/dist/KickChaos-IV-1.9.2-camera.zip).
 Seguir [las instrucciones](docs/STREAM-INSTALACION.md). Incluye la DLL, Numerics,
 el panel y un perfil tranquilo opcional. Conservar `camaras.ini`, `ranking.ini`
 y una copia del config propio antes de aplicar el perfil. No entrega el juego
 ni reemplaza cargadores.
+
+Para actualizar desde la 1.9.1, cerrar GTA y reemplazar solamente
+`scripts/KickChaos.net.dll`. Conservar la configuración y las cámaras propias;
+las nuevas opciones usan valores seguros aunque no estén en el config existente.
 
 Las posiciones y FOV guardados se conservan. `UsarDuracionGlobal` aplica los
 300 segundos sin reescribir las duraciones individuales; desactivarlo las respeta.

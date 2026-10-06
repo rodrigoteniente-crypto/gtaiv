@@ -1,8 +1,34 @@
-# KickChaos IV 1.9.1-stream
+# KickChaos IV 1.9.2-camera
 
-Esta versión parte de tu mod 1.9.0 y agrega el perfil de fondo tranquilo, eventos demorados, cámaras temporales, personajes sin vencimiento por tiempo, HUD y un panel externo. Está preparada para GTA IV Complete Edition con tu instalación de aCompleteEditionHook y ScriptHookDotNet. El ZIP incluye el mod y el panel; usá los cargadores que ya tenés instalados.
+La 1.9.2 corrige una regresión del seguimiento de NPC: la cámara podía colocarse por debajo del terreno. El log nuevo confirma que el personaje de prueba se creó, robó autos y condujo; el problema reportado se concentra en la cámara. El seguimiento ahora usa una toma estable y cercana, valida el terreno antes de mover la cámara y recupera la vista de ciudad cuando no encuentra una posición utilizable.
 
-## Instalar o actualizar
+[Descargar KickChaos IV 1.9.2-camera](https://github.com/rodrigoteniente-crypto/gtaiv/raw/refs/heads/kickchaos-camera-1.9.2/dist/KickChaos-IV-1.9.2-camera.zip)
+
+## Actualizar desde 1.9.1
+
+1. Cerrá GTA IV y guardá una copia de `scripts/KickChaos.net.dll` fuera de la carpeta `scripts`.
+2. Del ZIP, copiá **solamente** `Para-copiar-al-juego/scripts/KickChaos.net.dll` sobre el DLL de tu instalación.
+3. Conservá `scripts/KickChaos/config.ini`, `camaras.ini`, ranking, cargadores, dependencia y panel. Reiniciá GTA IV; F5 no carga un DLL nuevo.
+
+El panel no cambió. No hace falta aplicar nuevamente el perfil ni editar la configuración para activar la corrección. Si todavía no instalaste la 1.9.1, seguí la instalación completa de abajo.
+
+## Seguimiento estable
+
+La toma de NPC es estable por defecto, a unos 6 metros del personaje a pie y 10 metros en auto. Conserva tu FOV existente de `[Suscriptor] CamaraFOV`. F8 → Cámaras → Cámara de NPC permite ajustar «Seguimiento estable», «Distancia estable a pie» y «Distancia estable en auto». También podés cambiar estos valores en la sección `[Suscriptor]` de tu configuración actual:
+
+```ini
+CamaraEstable = si
+DistanciaEstablePie = 6
+DistanciaEstableAuto = 10
+```
+
+Si las claves no están, el mod usa esos valores automáticamente. La cámara prueba posiciones cercanas según el terreno cargado y conserva al NPC cuando necesita regresar a ciudad. Esta comprobación de altura no es un raycast de paredes ni demuestra visibilidad real: hace falta probar puentes, túneles y obstáculos dentro del juego.
+
+Para comprobar el hotfix, simulá una suscripción desde F8 → Debug → Probar acciones / eventos → Simular una suscripcion. Esperá el delay, pulsá F4 y mirá al personaje tanto a pie como en auto. Debe verse la toma cercana; F6 debe volver al plano de ciudad. Si vuelve a fallar, guardá `scripts/KickChaos/log.txt`: las líneas `[camdiag]` registran `actor`, `requested` y `native`, cada uno con XYZ, además de rotación, FOV y estado de seguimiento. El mod compiló fuera del juego; todavía falta validar esta versión en tu GTA IV.
+
+La versión conserva el perfil de fondo tranquilo, eventos demorados, cámaras temporales, personajes sin vencimiento por tiempo, HUD y panel externo que partieron de tu mod 1.9.0. Está preparada para GTA IV Complete Edition con tu instalación de aCompleteEditionHook y ScriptHookDotNet. El ZIP completo incluye el mod y el panel; usá los cargadores que ya tenés instalados.
+
+## Instalación completa
 
 1. Cerrá GTA IV y el panel. Guardá una copia de `scripts/KickChaos.net.dll` y de la carpeta `scripts/KickChaos`, especialmente `config.ini`, `camaras.ini` y el archivo de ranking que ya usás.
 2. Descomprimí el ZIP. Copiá **el contenido** de `Para-copiar-al-juego` a la carpeta donde está `GTAIV.exe`, aceptando reemplazar el DLL del mod. La carpeta `scripts` se combina con la existente.

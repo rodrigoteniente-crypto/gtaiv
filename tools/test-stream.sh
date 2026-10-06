@@ -8,6 +8,6 @@ if [[ -x /workspace/.onboarding/dotnet/dotnet ]]; then
   export NUGET_PACKAGES=/workspace/.onboarding/nuget
 fi
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
-for suite in StreamStability StreamCamera StreamEvents StreamHud StreamAmbient NpcPolicy StreamAdmin StreamPersistence; do
+for suite in StreamStability StreamCamera StreamCameraPlacement StreamEvents StreamHud StreamAmbient NpcPolicy StreamAdmin StreamPersistence; do
   dotnet run --project "$repo_dir/stream/tests/$suite" -c Release
 done

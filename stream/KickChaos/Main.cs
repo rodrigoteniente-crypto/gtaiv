@@ -15,7 +15,7 @@ namespace KickChaos
     /// </summary>
     public class KickChaosScript : GTA.Script
     {
-        public const string Version = "1.9.1-stream";
+        public const string Version = "1.9.2-camera";
 
         Config cfg;
         KickClient kick;

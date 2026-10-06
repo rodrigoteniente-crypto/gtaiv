@@ -1232,13 +1232,16 @@ namespace KickChaos
                 Choice("Como aparece", SU, "AlAparecer", new[] { "CamaraYSeguir", "Camara", "Seguir" }, new[] { "En camara y lo sigue", "En camara", "La camara lo sigue" }, "CamaraYSeguir", "El delay de Kick se aplica antes del spawn"),
                 Num("Espera visible antes de seguir", SU, "SegundosEnCamara", 5, 0, 30, 1, Sec, "Con 'En camara y lo sigue'"),
                 Bool("Camara bajo puentes / tuneles", SU, "CamaraBajoTierra", true, "Busca encuadre seguro o descarta la toma temporalmente"),
-                Num("Distancia de la camara", SU, "CamaraDistancia", 22, 5, 150, 1, v => v.ToString("0") + " m", "En auto se aleja un poco mas"),
-                Num("Altura de la camara", SU, "CamaraAltura", 6, 1, 80, 1, v => v.ToString("0") + " m", "Si un edificio tapa, sube sola"),
+                Bool("Seguimiento estable", SU, "CamaraEstable", true, "Toma cercana y suave. Comprueba el terreno antes de mover la camara"),
+                Num("Distancia estable a pie", SU, "DistanciaEstablePie", 6, 3, 25, 1, v => v.ToString("0") + " m", "Con Seguimiento estable activado"),
+                Num("Distancia estable en auto", SU, "DistanciaEstableAuto", 10, 3, 30, 1, v => v.ToString("0") + " m", "Con Seguimiento estable activado"),
+                Num("Distancia de tomas dinamicas", SU, "CamaraDistancia", 22, 5, 150, 1, v => v.ToString("0") + " m", "Con Seguimiento estable desactivado"),
+                Num("Altura de tomas dinamicas", SU, "CamaraAltura", 6, 1, 80, 1, v => v.ToString("0") + " m", "Con Seguimiento estable desactivado"),
                 Num("Zoom de la camara (FOV)", SU, "CamaraFOV", 30, 5, 90, 1, v => v.ToString("0"), "FOV bajo = teleobjetivo"),
                 Bool("Camara al tiroteo", SU, "CamaraAlTiroteo", true, "Cuando empieza un tiroteo, la camara va ahi y encuadra a todos (con 'Seguir NPC' puesto, se queda con el)"),
                 Bool("Camara apunta al objetivo", SU, "CamaraApuntaAlObjetivo", true, "Cuando dispara, la camara se pone atras de el y se ve a quien le tira"),
                 Bool("Camara dinamica", SU, "CamaraDinamica", true,
-                    "Cada 5-9 s cambia de toma: lo rodea, se acerca, va de costado, sube, se pone de frente. A los tiros prefiere las tomas cerca"),
+                    "Con Seguimiento estable desactivado: cambia de toma cada 5-9 s"),
             });
         }
 

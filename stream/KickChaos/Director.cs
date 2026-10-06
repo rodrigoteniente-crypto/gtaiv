@@ -118,7 +118,9 @@ namespace KickChaos
         float followDuration = 30f, followDist = 22f, followHeight = 6f, followFov = 30f;
         Vector3 fCam, fLook, fPrevTarget, fVel;
         float fAz, fH, lastDt = 0.016f;
-        int collisionPed;
+        bool stableFollow = true;
+        float stableFootDistance = 6f, stableCarDistance = 10f;
+        double fLastFallback = -100, fPoseInvalidSince = -1, fLastDiagnostic = -100;
         Vector3 fLastGoodCam;
         bool fHaveGoodCam;
         double fUnsafeSince = -1;
@@ -197,6 +199,9 @@ namespace KickChaos
             followHeight = Math.Max(1f, Math.Min(80f, ini.GetFloat(SU, "CamaraAltura", 6f)));
             followFov = Math.Max(5f, Math.Min(90f, ini.GetFloat(SU, "CamaraFOV", 30f)));
             followDynamic = ini.GetBool(SU, "CamaraDinamica", true);
+            stableFollow = ini.GetBool(SU, "CamaraEstable", true);
+            stableFootDistance = Config.SafeSeconds(ini.GetFloat(SU, "DistanciaEstablePie", 6), 6, 25);
+            stableCarDistance = Config.SafeSeconds(ini.GetFloat(SU, "DistanciaEstableAuto", 10), 10, 30);
             aimCam = ini.GetBool(SU, "CamaraApuntaAlObjetivo", true);
             underCam = ini.GetBool(SU, "CamaraBajoTierra", true);
             battleCam = ini.GetBool(SU, "CamaraAlTiroteo", true);
@@ -602,13 +607,6 @@ namespace KickChaos
         {
             CameraShot s = Current;
             if (s == null || !DOES_CAM_EXIST(cam)) return;
-            int desiredCollisionPed = s.IsFollow ? s.FollowPed : 0;
-            if (collisionPed != desiredCollisionPed)
-            {
-                collisionPed = desiredCollisionPed;
-                ENABLE_CAM_COLLISION(cam, collisionPed != 0);
-                if (collisionPed != 0) SET_CAM_TARGET_PED(cam, collisionPed);
-            }
             if (s.IsFollow) UpdateFollow(s, now, lastDt);
             else if (s.IsBattle) UpdateBattle(s, now, lastDt);
             float t = shotDuration > 0 ? (resumingShot ? (float)(resumeElapsed / shotDuration) : phase == Phase.Showing ? (float)((now - shotStart) / shotDuration) : 0f) : 0f;
@@ -635,10 +633,80 @@ namespace KickChaos
                 rot.X += a * (float)(0.6 * Math.Sin(now * 23.0 + shakePhase1) + 0.4 * Math.Sin(now * 37.0 + shakePhase2));
                 rot.Z += a * (float)(0.6 * Math.Sin(now * 19.0 + shakePhase2) + 0.4 * Math.Sin(now * 31.0 + shakePhase1));
             }
+            if (s.IsFollow && !ValidateFollowPose(s, now, ref pos, ref rot)) return;
             SET_CAM_POS(cam, pos);
             SET_CAM_ROT(cam, rot);
             SET_CAM_FOV(cam, fov);
             CamPos = pos; CamRot = rot; CamFov = fov;
+            if (s.IsFollow) DiagnoseFollow(s, now, pos, rot);
+        }
+
+        bool LocalFollowFloor(Vector3 probe, out float floor)
+        {
+            // G.GroundZ adds 2m. Cancel that offset so this remains a local query,
+            // especially inside a room where querying above a ceiling gives the roof.
+            if (fRoomKey != 0) probe.Z = Math.Min(probe.Z, fPrevTarget.Z + 1.1f);
+            return G.GroundZ(probe - new Vector3(0, 0, 2f), out floor);
+        }
+
+        bool ValidateFollowPose(CameraShot shot, double now, ref Vector3 position, ref Vector3 rotation)
+        {
+            Vector3 actor;
+            bool inCar, dead;
+            if (Npcs == null || !Npcs.FollowInfo(shot.FollowPed, out actor, out inCar, out dead) || dead) return false;
+            Vector3 look = actor + new Vector3(0, 0, 0.5f), placed;
+            bool valid = FollowCameraPlacementPolicy.TryPlace(position, look, LocalFollowFloor, out placed);
+            bool fallback = false;
+            if (!valid && now - fLastFallback >= 0.25)
+            {
+                fLastFallback = now;
+                float heading = 0;
+                try { GET_CHAR_HEADING(shot.FollowPed, out heading); } catch { }
+                valid = FollowCameraPlacementPolicy.TryFallback(look, heading, inCar, LocalFollowFloor, out placed);
+                fallback = valid;
+            }
+            if (!valid && fHaveGoodCam)
+                valid = FollowCameraPlacementPolicy.TryPlace(fLastGoodCam, look, LocalFollowFloor, out placed);
+            if (!valid)
+            {
+                if (fPoseInvalidSince < 0)
+                {
+                    fPoseInvalidSince = now;
+                    log("[camdiag] sin pose de terreno valida para NPC " + shot.FollowPed + " en " + IniFile.V3(actor.X, actor.Y, actor.Z));
+                }
+                if (now - fPoseInvalidSince >= 1.5)
+                {
+                    cameraSkipUntil[shot.FollowPed] = now + 60;
+                    log("[Camara] posicion insegura: conserva el NPC y vuelve a ciudad");
+                    ReleaseFollow();
+                    returnToCity = true;
+                }
+                // Leave the previously rendered camera intact; never install an invalid pose.
+                return false;
+            }
+            if (stableFollow || fallback || Vector3.Distance(position, placed) > 0.01f)
+                rotation = MathX.LookRotation(placed, look);
+            position = placed;
+            fCam = placed; fLastGoodCam = placed; fHaveGoodCam = true; fPoseInvalidSince = -1;
+            return true;
+        }
+
+        void DiagnoseFollow(CameraShot shot, double now, Vector3 requested, Vector3 rotation)
+        {
+            if (now - fLastDiagnostic < 5) return;
+            fLastDiagnostic = now;
+            try
+            {
+                Vector3 actual, actor;
+                GET_CAM_POS(cam, out actual);
+                GET_CHAR_COORDINATES(shot.FollowPed, out actor);
+                log("[camdiag] NPC " + shot.FollowPed + " actor=" + IniFile.V3(actor.X, actor.Y, actor.Z) +
+                    " pedRoom=" + fRoomKey + " requested=" + IniFile.V3(requested.X, requested.Y, requested.Z) +
+                    " native=" + IniFile.V3(actual.X, actual.Y, actual.Z) + " rot=" + IniFile.V3(rotation.X, rotation.Y, rotation.Z) +
+                    " fov=" + IniFile.F(CamFov) + " dz=" + IniFile.F(actual.Z - actor.Z) +
+                    " onScreen=" + IS_CHAR_ON_SCREEN(shot.FollowPed) + " stable=" + stableFollow);
+            }
+            catch (Exception ex) { log("[camdiag] " + ex.Message); }
         }
 
         /// <summary>Pose actual de la camara del director (para saber que se ve).</summary>
@@ -1163,7 +1231,6 @@ namespace KickChaos
                 cameraSkipUntil.Remove(previous);
                 cameraSkipUntil[replacement] = skippedUntil;
             }
-            if (collisionPed == previous) collisionPed = 0;
         }
 
         static void ReplaceFollowPed(CameraShot shot, int previous, int replacement)
@@ -1204,8 +1271,7 @@ namespace KickChaos
 
         Vector3 FollowPose(float az, float h, float dist, Vector3 look)
         {
-            // A ground-height query can return a bridge roof. It cannot detect camera obstruction.
-            // Native camera collision handles nearby geometry without lifting the shot above a tunnel.
+            // Position is owned by this script; ValidateFollowPose checks loaded local terrain.
             return look + Flat(az) * dist + new Vector3(0, 0, h);
         }
 
@@ -1214,7 +1280,7 @@ namespace KickChaos
             return FollowCameraGeometry.Usable(camPos, look);
         }
 
-        /// <summary>Pose inicial moderada; la colision nativa ajusta el espacio entre NPC y camara.</summary>
+        /// <summary>Proposal only. It must pass the local terrain check before reaching the renderer.</summary>
         bool FindFollowSpot(Vector3 look, float dist, float preferAz, float baseH, out float az, out float h)
         {
             float[] offs = { 0f, 35f, -35f, 70f, -70f, 110f, -110f, 180f, 145f, -145f };
@@ -1255,8 +1321,15 @@ namespace KickChaos
             fBlockedSince = -1;
             fLastAnchor = G.Now;
             fLastGoodCam = fCam;
-            fHaveGoodCam = FollowCameraGeometry.Usable(fCam, look);
+            fHaveGoodCam = false;
             fUnsafeSince = -1;
+            fPoseInvalidSince = -1; fLastFallback = fLastDiagnostic = -100;
+            if (stableFollow)
+            {
+                float close = inCar ? Math.Max(3, stableCarDistance) : Math.Max(3, stableFootDistance);
+                fCam = look + Flat(pref) * close + new Vector3(0, 0, inCar ? 2.5f : 1.6f);
+                fLook = look;
+            }
             s.Pos = fCam;
             s.Rot = MathX.LookRotation(fCam, fLook);
             s.Fov = followFov + fFovAdd;
@@ -1310,7 +1383,7 @@ namespace KickChaos
         }
 
         /// <summary>
-        /// Interiores: usar la sala real del NPC, una toma cercana y colision nativa.
+        /// Interiores: usar la sala real del NPC y una toma manual cercana.
         /// Mantener al espectador oculto en la misma sala para que se dibuje el tunel.
         /// </summary>
         bool UnderFollow(CameraShot s, double now, float dt, Vector3 target, Vector3 look, bool inCar, float flatSpeed)
@@ -1388,6 +1461,22 @@ namespace KickChaos
             Vector3 look = target + new Vector3(0, 0, 0.5f);
             float flatSpeed = (float)Math.Sqrt(fVel.X * fVel.X + fVel.Y * fVel.Y);
             if (underCam && UnderFollow(s, now, dt, target, look, inCar, flatSpeed)) return;
+            if (stableFollow)
+            {
+                float heading = 0;
+                try { GET_CHAR_HEADING(s.FollowPed, out heading); } catch { }
+                float wantedAngle = heading + (inCar ? 180f : 35f);
+                float turn = MathX.AngleDiff(fAz, wantedAngle);
+                float limit = (inCar ? 100f : 65f) * dt;
+                fAz += Math.Max(-limit, Math.Min(limit, turn));
+                float close = inCar ? Math.Max(3, stableCarDistance) : Math.Max(3, stableFootDistance);
+                Vector3 wanted = look + Flat(fAz) * close + new Vector3(0, 0, inCar ? 2.5f : 1.6f);
+                fCam = Vector3.Distance(fCam, target) > 40 ? wanted : Vector3.Lerp(fCam, wanted, 1f - (float)Math.Exp(-dt * (inCar ? 7 : 5)));
+                fLook = look;
+                KeepFollowSceneLoaded(target, now);
+                s.Pos = fCam; s.Rot = MathX.LookRotation(fCam, look); s.Fov = followFov;
+                return;
+            }
 
             // a los tiros: la camara mira tambien a quien le esta tirando (atras de el, de tres cuartos)
             Vector3 aimT = Vector3.Zero;
@@ -1477,7 +1566,7 @@ namespace KickChaos
             else if (fH < baseH - 0.3f || (fH > baseH + 0.3f && fH < baseH * 1.2f + 1f)) fH += (baseH - fH) * (1f - (float)Math.Exp(-dt * 0.8));
 
             // Si la pose pierde una composicion util, bajar a una toma moderada.
-            // La deteccion de paredes corresponde a la colision nativa, nunca a alturas de techos.
+            // La validacion final del terreno se hace antes de aplicar la pose al renderer.
             if (now - fLastLos > 0.2)
             {
                 fLastLos = now;
@@ -1523,22 +1612,26 @@ namespace KickChaos
             else
             {
                 fUnsafeSince = -1;
-                fHaveGoodCam = true;
-                fLastGoodCam = nextCam;
             }
             fCam = nextCam;
             fLook = Vector3.Lerp(fLook, look, 1f - (float)Math.Exp(-dt * 6.0));
 
-            // Niko (invisible) va con el NPC para que la ciudad cargue alrededor
+            KeepFollowSceneLoaded(target, now);
+            s.Pos = fCam;
+            s.Rot = MathX.LookRotation(fCam, fLook);
+            s.Fov = Math.Max(8f, Math.Min(80f, followFov + fFovAdd));
+        }
+
+        void KeepFollowSceneLoaded(Vector3 target, double now)
+        {
+            // Both follow modes move the hidden player so GTA keeps the nearby city loaded.
             Vector3 a = anchor;
             if (now - fLastAnchor > 1.5 && Math.Sqrt((a.X - target.X) * (a.X - target.X) + (a.Y - target.Y) * (a.Y - target.Y)) > 20.0)
             {
                 fLastAnchor = now;
                 MovePlayer(target + new Vector3(0, 0, anchorHeight));
+                REQUEST_COLLISION_AT_POSN(target);
             }
-            s.Pos = fCam;
-            s.Rot = MathX.LookRotation(fCam, fLook);
-            s.Fov = Math.Max(8f, Math.Min(80f, followFov + fFovAdd));
         }
 
         // ------------------------------------------------------------------
@@ -1994,7 +2087,6 @@ namespace KickChaos
         {
             if (cam != 0 && DOES_CAM_EXIST(cam)) return;
             CREATE_CAM(14, out cam);
-            collisionPed = -1;
             SET_CAM_FOV(cam, defFov);
             SET_CAM_ACTIVE(cam, true);
             SET_CAM_PROPAGATE(cam, true);
@@ -2013,7 +2105,6 @@ namespace KickChaos
             }
             else ACTIVATE_SCRIPTED_CAMS(false, false);
             cam = 0;
-            collisionPed = 0;
         }
 
         // ------------------------------------------------------------------
