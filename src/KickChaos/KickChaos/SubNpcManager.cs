@@ -19,6 +19,7 @@ public class SubNpcManager
 		public Gang Rival;
 
 		public Vector3 Pos;
+
 	}
 
 	private class Cop
@@ -31,13 +32,15 @@ public class SubNpcManager
 
 		public int Target;
 
-		public int Fails;
+		public int Weapon;
 
 		public int Block = -1;
 
 		public bool Driver;
 
 		public bool Seen;
+
+		public bool WasInCar;
 
 		public double Spawned;
 
@@ -55,7 +58,13 @@ public class SubNpcManager
 
 		public double PhaseLen = 4.0;
 
+		public double LastExit = -100.0;
+
+		public double EntryRetryAt = -1.0;
+
 		public Vector3 Pos;
+
+		public Vector3 MoveTo;
 
 		public bool Alive => Ped != 0 && DeadAt < 0.0;
 	}
@@ -73,6 +82,8 @@ public class SubNpcManager
 		public int Target;
 
 		public int StealCar;
+
+		public int FailedCar;
 
 		public int Phase;
 
@@ -138,6 +149,8 @@ public class SubNpcManager
 
 		public double LastCarCheck = -100.0;
 
+		public double CarRetryUntil = -1.0;
+
 		public Vector3 Pos;
 
 		public Vector3 Head;
@@ -175,6 +188,8 @@ public class SubNpcManager
 		public double HandsUpAt = -1.0;
 
 		public bool CruiseFast;
+
+		public bool DriveByWeapon;
 
 		public uint StartHealth = 200u;
 
@@ -502,6 +517,8 @@ public class SubNpcManager
 
 	public float NameScale = 1f;
 
+	public bool UseGameAi { get; private set; }
+
 	private static readonly string DefaultCars = "SULTAN,BANSHEE,INFERNUS,COMET,FEROCI,PMP600,BUFFALO,TURISMO";
 
 	private Font[] nameFonts;
@@ -565,8 +582,10 @@ public class SubNpcManager
 
 	public void ApplyConfig(Config c)
 	{
+		bool previousGameAi = UseGameAi;
 		cfg = c;
 		IniFile ini = c.Ini;
+		UseGameAi = string.Equals(ini.Get("Suscriptor", "IA", "Juego").Trim(), "Juego", StringComparison.OrdinalIgnoreCase);
 		tiers[0] = ini.Get("Suscriptor", "Nivel1", "Pelea");
 		tiers[1] = ini.Get("Suscriptor", "Nivel2", "Huir");
 		tiers[2] = ini.Get("Suscriptor", "Nivel3", "Tiroteo");
@@ -609,6 +628,50 @@ public class SubNpcManager
 		GangRules.Dedupe(slots);
 		ShowChat = ini.GetBool("Suscriptor", "MostrarMensajes", def: true);
 		ShowTimer = ini.GetBool("Suscriptor", "MostrarTiempo", def: true);
+		if (previousGameAi != UseGameAi)
+			ResetAiTasks();
+	}
+
+	private void ResetAiTasks()
+	{
+		double now = G.Now;
+		foreach (Gang gang in gangs)
+		{
+			foreach (Member member in gang.Members)
+			{
+				if (member.Dead || member.Ped == 0 || !N.DOES_CHAR_EXIST(member.Ped))
+					continue;
+				// Keep door, eating and surrender animations intact on a live toggle.
+				if (member.Mode != M_ENTER_CAR && member.Mode != M_LEAVE_CAR && !member.Eating && member.Mode != M_HANDS)
+				{
+					N.CLEAR_CHAR_TASKS(member.Ped);
+					member.Mode = M_NONE;
+					member.Target = 0;
+					member.Phase = P_NONE;
+					member.LastTask = -100.0;
+					member.StillSince = -1.0;
+				}
+				member.NextThink = now;
+				if (UseGameAi && gang.Fighter)
+					N.SET_CHAR_DECISION_MAKER_TO_DEFAULT(member.Ped);
+			}
+			foreach (Cop cop in AllCops(gang))
+			{
+				if (!cop.Alive || cop.Ped == 0 || !N.DOES_CHAR_EXIST(cop.Ped)
+					|| N.IS_CHAR_DEAD(cop.Ped) || N.IS_CHAR_FATALLY_INJURED(cop.Ped))
+					continue;
+				if (cop.Mode == M_ENTER_CAR || cop.Mode == M_LEAVE_CAR)
+					continue;
+				N.CLEAR_CHAR_TASKS(cop.Ped);
+				cop.Mode = M_NONE;
+				cop.LastTask = -100.0;
+				cop.StillSince = -1.0;
+				N.SET_CHAR_DECISION_MAKER_TO_DEFAULT(cop.Ped);
+				if (gang.Lethal && madeCops.Contains(cop.Ped))
+					CopLethal(cop.Ped);
+			}
+		}
+		log("[NPC] IA: " + (UseGameAi ? "Juego (combate y cobertura nativos)" : "Mod (combate nativo con recuperacion dirigida)"));
 	}
 
 	private int LiveGangs()
@@ -750,6 +813,21 @@ public class SubNpcManager
 			}
 		}
 		return list[list.Count - 1];
+	}
+
+	public int NextForCamera(int current)
+	{
+		List<int> live = new List<int>();
+		foreach (Gang gang in gangs)
+			if (gang.State == 1)
+				foreach (Member member in gang.Members)
+					if (!member.Dead && member.Ped != 0 && N.DOES_CHAR_EXIST(member.Ped)
+						&& !N.IS_CHAR_DEAD(member.Ped) && !N.IS_CHAR_FATALLY_INJURED(member.Ped))
+						live.Add(member.Ped);
+		if (live.Count == 0)
+			return 0;
+		int index = live.IndexOf(current);
+		return live[(index + 1) % live.Count];
 	}
 
 	public bool Hotspot(out Vector3 p)
@@ -1268,11 +1346,13 @@ public class SubNpcManager
 		N.SET_CHAR_SHOOT_RATE(ped, 100);
 		N.SET_SENSE_RANGE(ped, CombatPolicy.SightRange);
 		N.SET_CHAR_WILL_MOVE_WHEN_INJURED(ped, v: true);
+		N.SET_CHAR_WILL_ONLY_FIRE_WITH_CLEAR_LOS(ped, true);
 		N.SET_CHAR_WILL_USE_COVER(ped, v: true);
 		N.SET_CHAR_WILL_DO_DRIVEBYS(ped, v: true);
+		N.SET_CHAR_WILL_USE_CARS_IN_COMBAT(ped, v: true);
 		N.SET_CHAR_CANT_BE_DRAGGED_OUT(ped, v: true);
 		N.SET_CHAR_STAY_IN_CAR_WHEN_JACKED(ped, v: true);
-		N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(ped, v: false);
+		N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(ped, v: UseGameAi);
 		if (m.Index == 0)
 		{
 			switch (g.Behavior)
@@ -1736,6 +1816,11 @@ public class SubNpcManager
 		else if (!m.InCar)
 		{
 			m.Driving = false;
+			if (m.DriveByWeapon)
+			{
+				N.SET_CURRENT_CHAR_WEAPON(m.Ped, m.Weapon, b: true);
+				m.DriveByWeapon = false;
+			}
 		}
 		if (m.ProtectUntil > 0.0 && now > m.ProtectUntil)
 		{
@@ -1829,7 +1914,7 @@ public class SubNpcManager
 		}
 	}
 
-	private static void Task(Member m, int mode, double now)
+	private void Task(Member m, int mode, double now)
 	{
 		if (m.Mode != mode)
 		{
@@ -1839,9 +1924,10 @@ public class SubNpcManager
 		m.LastTask = now;
 		if (m.G != null && m.G.Fighter)
 		{
-			// These are explicit script tasks, including combat. Allowing ambient
-			// fear/crime events here can replace them with civilian fleeing tasks.
-			Block(m, mode != M_HANDS);
+			// Native mode allows the game's combat reactions; explicit travel and
+			// vehicle entry keep ownership so a random ambient event cannot cancel them.
+			bool nativeCombat = UseGameAi && (mode == M_COMBAT || mode == M_DRIVEBY);
+			Block(m, mode != M_HANDS && !nativeCombat);
 		}
 	}
 
@@ -1875,6 +1961,7 @@ public class SubNpcManager
 
 	private void RunTo(Member m, Vector3 p, double now, bool straight)
 	{
+		bool continuing = m.Mode == M_GOTO || m.Mode == M_GOTO2 || m.Mode == M_COVER || m.Mode == M_STRAFE;
 		if (straight)
 		{
 			N._TASK_GO_STRAIGHT_TO_COORD(m.Ped, p, 4);
@@ -1885,7 +1972,8 @@ public class SubNpcManager
 		}
 		Task(m, (!straight) ? 3 : 11, now);
 		m.MoveTo = p;
-		m.StillSince = -1.0;
+		if (!continuing)
+			m.StillSince = -1.0;
 	}
 
 	private void Shoot(Member m, int target, double now)
@@ -1911,7 +1999,7 @@ public class SubNpcManager
 
 	private void Cruise(Member m, int car, float speed, double now, int mode)
 	{
-		N._TASK_CAR_DRIVE_WANDER(m.Ped, car, speed, 2u);
+		N._TASK_CAR_DRIVE_WANDER(m.Ped, car, speed, AiTaskPolicy.RoadDrivingStyle);
 		bool flag = m.Mode == mode;
 		Task(m, mode, now);
 		if (!flag)
@@ -1994,6 +2082,9 @@ public class SubNpcManager
 
 	private void Think(Gang g, Member m, double now)
 	{
+		// Sample continuously; sampling only when reissuing a path then clearing
+		// StillSince made the stuck-path fallback impossible to reach.
+		Moving(m, now, m.InCar ? 1.5f : 0.4f);
 		if (m.Eating)
 		{
 			ThinkEat(g, m, now);
@@ -2001,11 +2092,25 @@ public class SubNpcManager
 		}
 		if (m.InCar && m.Mode == 7)
 		{
-			if (now - m.ModeAt > 4.0)
+			if (now - m.LastTask > 8.0)
 			{
 				LeaveCar(m, now);
 			}
 			return;
+		}
+		if (!m.InCar && m.Mode == M_ENTER_CAR)
+		{
+			float distance = CarOk(m.StealCar) ? Vector3.Distance(G.CarPos(m.StealCar), m.Pos) : float.MaxValue;
+			if (AiTaskPolicy.KeepVehicleEntry(CarOk(m.StealCar), distance,
+				now - m.StealSince, N.IS_CHAR_GETTING_IN_TO_A_CAR(m.Ped)))
+				return;
+			// Do not choose the same inaccessible/occupied vehicle again every tick.
+			m.FailedCar = m.StealCar;
+			m.CarRetryUntil = now + 30.0;
+			m.StealCar = 0;
+			m.Seat = -1;
+			m.Mode = M_NONE;
+			N.CLEAR_CHAR_TASKS(m.Ped);
 		}
 		bool flag = g.Order >= 0 && now < g.OrderUntil;
 		if (m.Fleeing)
@@ -2128,9 +2233,23 @@ public class SubNpcManager
 			return;
 		}
 		bool flag = g.Behavior == NpcBehavior.Huir || (t.Cop && !Hostile(g, now));
+		if (UseGameAi && m.Mode == M_COMBAT && !flag)
+		{
+			if (ThreatOf(g, m, m.Target, out Threat previous) && previous.Dist <= 120f)
+			{
+				NativeVehicleCombat(g, m, previous, now);
+				return;
+			}
+			N.CLEAR_CHAR_TASKS(m.Ped);
+			m.Mode = M_NONE;
+			m.Target = 0;
+		}
 		if (t.Ped != 0 && t.Dist < 38f && !flag)
 		{
-			BailOut(g, m, now, (!t.Cop) ? ("se baja a pelear con la banda de " + t.Rival.User) : "se baja a enfrentar a la policia");
+			if (UseGameAi)
+				NativeVehicleCombat(g, m, t, now);
+			else
+				BailOut(g, m, now, (!t.Cop) ? ("se baja a pelear con la banda de " + t.Rival.User) : "se baja a enfrentar a la policia");
 			return;
 		}
 		Gang gang = ((!Hunting(g, now)) ? null : NearestRivalGang(g));
@@ -2142,13 +2261,16 @@ public class SubNpcManager
 				float num = Vector3.Distance(member.Pos, m.Pos);
 				if (num < 45f)
 				{
-					BailOut(g, m, now, "llego a donde esta la banda de " + gang.User);
+					if (UseGameAi && !flag)
+						NativeVehicleCombat(g, m, new Threat { Ped = member.Ped, Dist = num, Pos = member.Pos, Rival = gang }, now);
+					else
+						BailOut(g, m, now, "llego a donde esta la banda de " + gang.User);
 				}
 				else if (!WaitForCrew(g, m, car, now))
 				{
 					if (m.Mode != 4 || m.Target != member.Ped || (!Moving(m, now, 1.5f) && StillFor(m, now) > 6.0) || now - m.LastTask > 30.0)
 					{
-						N._TASK_CAR_MISSION_PED_TARGET(m.Ped, car, member.Ped, 4u, Math.Max(fleeSpeed, 28f), 2u, 15u, 10u);
+						N._TASK_CAR_MISSION_PED_TARGET(m.Ped, car, member.Ped, 4u, Math.Max(fleeSpeed, 28f), AiTaskPolicy.RoadDrivingStyle, 15u, 10u);
 						Task(m, 4, now);
 						m.Target = member.Ped;
 						m.StillSince = -1.0;
@@ -2167,7 +2289,7 @@ public class SubNpcManager
 		{
 			if (m.Mode != 17 || (!Moving(m, now, 1.5f) && StillFor(m, now) > 6.0))
 			{
-				N._TASK_CAR_MISSION_PED_TARGET(m.Ped, car, leader.Ped, 2u, fleeSpeed + 5f, 2u, 10u, 10u);
+				N._TASK_CAR_MISSION_PED_TARGET(m.Ped, car, leader.Ped, 2u, fleeSpeed + 5f, AiTaskPolicy.RoadDrivingStyle, 10u, 10u);
 				Task(m, 17, now);
 				m.StillSince = -1.0;
 			}
@@ -2179,6 +2301,29 @@ public class SubNpcManager
 		}
 	}
 
+	private void NativeVehicleCombat(Gang g, Member m, Threat target, double now)
+	{
+		// In Juego mode the engine owns the whole combat task, including whether
+		// this vehicle/seat permits fighting or requires exiting. Do not replace
+		// it with a competing wander/drive-to command on the next half-second tick.
+		if (m.Mode == M_COMBAT && m.Target == target.Ped && StillFor(m, now) > 20.0
+			&& now - m.LastShot > 10.0)
+		{
+			BailOut(g, m, now, "el combate en auto quedo detenido: sigue a pie");
+			return;
+		}
+		if (m.Mode != M_COMBAT || m.Target != target.Ped
+			|| (!N.IS_PED_IN_COMBAT(m.Ped) && now - m.LastTask > 14.0))
+		{
+			N.SET_CHAR_WILL_USE_CARS_IN_COMBAT(m.Ped, v: true);
+			N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(m.Ped, v: true);
+			N._TASK_COMBAT(m.Ped, target.Ped);
+			Task(m, M_COMBAT, now);
+			m.Target = target.Ped;
+		}
+		Say(m, "combate del juego desde el auto", quiet: true);
+	}
+
 	private void DriveAround(Gang g, Member m, int car, double now, string what)
 	{
 		Say(m, (!g.Wanted) ? "maneja por ahi" : what);
@@ -2186,7 +2331,7 @@ public class SubNpcManager
 		if (m.Mode != 5 || m.CruiseFast != wanted)
 		{
 			m.CruiseFast = wanted;
-			N._TASK_CAR_DRIVE_WANDER(m.Ped, car, (!wanted) ? 16f : fleeSpeed, (!wanted) ? 1u : 2u);
+			N._TASK_CAR_DRIVE_WANDER(m.Ped, car, (!wanted) ? 16f : fleeSpeed, (!wanted) ? 0u : AiTaskPolicy.RoadDrivingStyle);
 			bool flag = m.Mode == 5;
 			Task(m, 5, now);
 			if (!flag)
@@ -2203,7 +2348,8 @@ public class SubNpcManager
 			}
 			else if (num > (double)((!wanted) ? 12 : 4) && now - m.LastTask > 4.0)
 			{
-				N._TASK_CAR_DRIVE_WANDER(m.Ped, car, (!wanted) ? 16f : fleeSpeed, (!wanted) ? 1u : 2u);
+				N._TASK_CAR_DRIVE_WANDER(m.Ped, car, (!wanted) ? 16f : fleeSpeed, (!wanted) ? 0u : AiTaskPolicy.RoadDrivingStyle);
+				m.LastTask = now;
 			}
 		}
 	}
@@ -2260,8 +2406,15 @@ public class SubNpcManager
 		Threat threat = Sticky(g, m, NearestThreat(g, m, 45f), 45f);
 		if (threat.Ped != 0 && m.Armed && (!threat.Cop || Hostile(g, now)))
 		{
-			if (m.Mode != 9 || m.Target != threat.Ped || now - m.LastTask > 10.0)
+			if (m.Mode != M_DRIVEBY || m.Target != threat.Ped
+				|| (now - m.LastShot > 12.0 && now - m.LastTask > 12.0 && !N.IS_PED_DOING_DRIVEBY(m.Ped)))
 			{
+				if (!m.DriveByWeapon)
+				{
+					N.GIVE_WEAPON_TO_CHAR(m.Ped, 12, 600, b: false);
+					N.SET_CURRENT_CHAR_WEAPON(m.Ped, 12, b: true);
+					m.DriveByWeapon = true;
+				}
 				N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(m.Ped, v: false);
 				N.SET_CHAR_WILL_DO_DRIVEBYS(m.Ped, v: true);
 				N._TASK_COMBAT(m.Ped, threat.Ped);
@@ -2272,9 +2425,14 @@ public class SubNpcManager
 		}
 		else
 		{
-			if (m.Mode != 15 && m.Mode != 9)
+			if (m.Mode == M_DRIVEBY)
 			{
-				Task(m, 15, now);
+				N.CLEAR_CHAR_TASKS(m.Ped);
+				m.Target = 0;
+			}
+			if (m.Mode != M_RIDE)
+			{
+				Task(m, M_RIDE, now);
 			}
 			Say(m, "va en el auto de la banda");
 		}
@@ -2414,6 +2572,8 @@ public class SubNpcManager
 		float num = radius;
 		foreach (int item in G.VehiclesNear(m.Pos, radius, 12))
 		{
+			if (item == m.FailedCar && G.Now < m.CarRetryUntil)
+				continue;
 			if (G.ProtectedCars.Contains(item) || N.IS_EMERGENCY_SERVICES_VEHICLE(item) || N.IS_CAR_ON_FIRE(item) || N.IS_CAR_UPSIDEDOWN(item))
 			{
 				continue;
@@ -2486,19 +2646,24 @@ public class SubNpcManager
 			m.LastSeen = now;
 			m.Seen = CanSee(m.Ped, m.Pos, t.Ped, t.Pos);
 		}
-		bool flag = m.Mode == 3 || m.Mode == 11;
-		float approachRange = m.Armed ? 45f : 3.5f;
-		if (t.Dist > approachRange || (flag && !m.Seen && t.Dist > 10f && now - m.ModeAt < 3.0))
+		bool approaching = m.Mode == M_GOTO || m.Mode == M_GOTO2;
+		if (t.Dist > CombatPolicy.SightRange)
 		{
-			if (targetChanged || !flag || now - m.LastTask > 3.0)
+			if (targetChanged || !approaching || AiTaskPolicy.RefreshPath(now - m.LastTask,
+				FlatDist(m.MoveTo, t.Pos), StillFor(m, now), FlatDist(m.Pos, m.MoveTo) < 2f))
 			{
-				bool straight = flag && !Moving(m, now, 0.5f) && StillFor(m, now) > 2.0;
+				bool straight = approaching && StillFor(m, now) > 4.0;
 				RunTo(m, t.Pos, now, straight);
 			}
 			m.Target = t.Ped;
 			Say(m, "va hacia " + text, quiet: true);
 			return;
 		}
+		if (N.IS_PED_RAGDOLL(m.Ped) || N.IS_CHAR_GETTING_UP(m.Ped))
+			return;
+		if (!targetChanged && approaching && !m.Seen && now - m.LastTask < 3.0
+			&& FlatDist(m.Pos, m.MoveTo) > 2f && StillFor(m, now) < 4.0)
+			return;
 		// Let an aimed burst finish. Replacing it on the next think tick prevents
 		// the weapon animation from ever reaching a shot.
 		if (!targetChanged && m.Mode == M_SHOOT && now - m.LastTask < m.PhaseLen)
@@ -2506,9 +2671,11 @@ public class SubNpcManager
 			Say(m, "a los tiros con " + text);
 			return;
 		}
+		N.GET_CHAR_SPEED(m.Ped, out float combatSpeed);
 		CombatPolicy.Recovery recovery = CombatPolicy.Decide(m.Armed,
 			targetChanged || m.Mode != M_COMBAT, N.IS_PED_IN_COMBAT(m.Ped),
-			m.Seen, t.Dist, now - m.LastTask, now - m.LastShot);
+			m.Seen, t.Dist, now - m.LastTask, now - m.LastShot, combatSpeed,
+			N.IS_PED_IN_COVER(m.Ped) || N.IS_CHAR_DUCKING(m.Ped), UseGameAi);
 		if (recovery == CombatPolicy.Recovery.Advance)
 		{
 			Approach(m, t, now, stuck: false);
@@ -2525,7 +2692,7 @@ public class SubNpcManager
 		}
 		else if (recovery == CombatPolicy.Recovery.Engage)
 		{
-			Block(m, on: true);
+			N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(m.Ped, v: UseGameAi);
 			N._TASK_COMBAT(m.Ped, t.Ped);
 			Task(m, M_COMBAT, now);
 			m.Target = t.Ped;
@@ -2716,19 +2883,9 @@ public class SubNpcManager
 		{
 			return false;
 		}
-		if (!N.HAS_CHAR_SPOTTED_CHAR(ped, target))
-		{
-			return false;
-		}
-		Vector3 value = from + new Vector3(0f, 0f, 0.7f);
-		Vector3 value2 = to + new Vector3(0f, 0f, 0.7f);
-		float num = Vector3.Distance(value, value2);
-		if (num < 4f)
-		{
-			return true;
-		}
-		Vector3 hit;
-		return !G.Raycast(Vector3.Lerp(value, value2, 1.5f / num), Vector3.Lerp(value, value2, 1f - 1.5f / num), out hit);
+		// Roof-height sampling is not line of sight: under a bridge it blocked
+		// every shot. Per-ped clear-LOS firing is enforced by the engine instead.
+		return N.HAS_CHAR_SPOTTED_CHAR(ped, target);
 	}
 
 	private void Approach(Member m, Threat t, double now, bool stuck)
@@ -3466,9 +3623,9 @@ public class SubNpcManager
 		}
 	}
 
-	private static void CopLethal(int cop)
+	private void CopLethal(int cop)
 	{
-		N.SET_CHAR_RELATIONSHIP_GROUP(cop, 30);
+		N.SET_CHAR_RELATIONSHIP_GROUP(cop, UseGameAi ? 3 : GROUP_COPS);
 		N.SET_CHAR_RELATIONSHIP(cop, 0u, GROUP_COPS);
 		N.SET_CHAR_RELATIONSHIP(cop, 0u, 3);
 		for (int i = 0; i < 7; i++)
@@ -3768,7 +3925,7 @@ public class SubNpcManager
 				}
 				if (m.Mode != 4 || m.Target != t.Ped || now - m.LastTask > 20.0)
 				{
-					N._TASK_CAR_MISSION_PED_TARGET(m.Ped, m.Car, t.Ped, 4u, 30f, 2u, 15u, 10u);
+					N._TASK_CAR_MISSION_PED_TARGET(m.Ped, m.Car, t.Ped, 4u, 30f, AiTaskPolicy.RoadDrivingStyle, 15u, 10u);
 					Task(m, 4, now);
 					m.Target = t.Ped;
 				}
@@ -4058,6 +4215,8 @@ public class SubNpcManager
 				N.SET_CHAR_ACCURACY(num6, (g.Stars < 4) ? 40u : 50u);
 				N.SET_CHAR_SHOOT_RATE(num6, 100);
 				N.SET_CHAR_WILL_MOVE_WHEN_INJURED(num6, v: true);
+				N.SET_CHAR_WILL_ONLY_FIRE_WITH_CLEAR_LOS(num6, true);
+				N.SET_CHAR_WILL_USE_CARS_IN_COMBAT(num6, v: true);
 				if (g.Stars >= 4)
 				{
 					N.ADD_ARMOUR_TO_CHAR(num6, 100);
@@ -4071,9 +4230,11 @@ public class SubNpcManager
 				g.Cops.Add(new Cop
 				{
 					Ped = num6,
+					Weapon = num7,
 					Car = veh,
 					Driver = (num6 == ped),
 					Spawned = now,
+					WasInCar = true,
 					Pos = spot
 				});
 				num5++;
@@ -4163,252 +4324,243 @@ public class SubNpcManager
 				}
 			}
 		}
-		HashSet<int> hashSet = new HashSet<int>();
-		foreach (Cop cop3 in g.Cops)
+		// Exactly one loop owns each managed cop. Vehicle transitions finish before
+		// issuing combat; passengers never replace the driver's pursuit task.
+		HashSet<int> exitCars = new HashSet<int>();
+		HashSet<int> reservedDrivers = new HashSet<int>();
+		foreach (Cop cop in g.Cops)
+			if (cop.Alive && cop.Mode == M_ENTER_CAR && cop.Driver && now - cop.LastTask < 16.0)
+				reservedDrivers.Add(cop.Car);
+		foreach (Cop cop in g.Cops)
 		{
-			if (cop3.Alive && cop3.Driver)
+			if (!cop.Alive || !N.IS_CHAR_IN_ANY_CAR(cop.Ped))
+				continue;
+			N.GET_CAR_CHAR_IS_USING(cop.Ped, out int currentCar);
+			if (currentCar != 0 && currentCar != cop.Car)
 			{
-				hashSet.Add(cop3.Car);
+				if (cop.Car != 0)
+					g.Cars[cop.Car] = now;
+				cop.Car = currentCar;
+				cop.Mode = M_NONE;
+				cop.StillSince = -1.0;
+				Changed();
 			}
+			N.GET_DRIVER_OF_CAR(cop.Car, out int currentDriver);
+			cop.Driver = currentDriver == cop.Ped;
+			if (!cop.Driver)
+				continue;
+			Member target = CopTarget(g, cop);
+			if (target == null)
+				continue;
+			ObserveCopMovement(cop, now, true);
+			float distance = Vector3.Distance(cop.Pos, target.Pos);
+			double still = cop.StillSince < 0.0 ? 0.0 : now - cop.StillSince;
+			if (AiTaskPolicy.ExitPoliceCar(CarOk(cop.Car), target.InCar, distance, still))
+				exitCars.Add(cop.Car);
 		}
-		foreach (Cop cop4 in g.Cops)
+		foreach (Cop cop in g.Cops)
 		{
-			if (cop4.Alive && !cop4.Driver && cop4.Car != 0 && !hashSet.Contains(cop4.Car))
-			{
-				cop4.Driver = true;
-				hashSet.Add(cop4.Car);
-				cop4.Mode = 0;
-			}
-		}
-		HashSet<int> hashSet2 = new HashSet<int>();
-		HashSet<int> hashSet3 = new HashSet<int>();
-		foreach (Cop cop5 in g.Cops)
-		{
-			if (cop5.Ped == 0 || !cop5.Driver)
-			{
+			if (!cop.Alive)
 				continue;
-			}
-			if (!cop5.Alive)
-			{
-				hashSet2.Add(cop5.Car);
+			Member target = CopTarget(g, cop);
+			if (target == null)
 				continue;
-			}
-			bool flag = N.IS_CHAR_IN_ANY_CAR(cop5.Ped);
-			if (flag)
+			bool inCar = N.IS_CHAR_IN_ANY_CAR(cop.Ped);
+			if (!inCar && cop.WasInCar)
 			{
-				hashSet3.Add(cop5.Car);
+				cop.LastExit = now;
+				cop.Mode = M_NONE;
+				cop.StillSince = -1.0;
+				if (cop.Weapon != 0)
+					N.SET_CURRENT_CHAR_WEAPON(cop.Ped, cop.Weapon, b: true);
 			}
-			Member member = CopTarget(g, cop5);
-			if (member == null || member.InCar || !flag)
+			cop.WasInCar = inCar;
+			float distance = Vector3.Distance(cop.Pos, target.Pos);
+			bool changed = cop.Target != target.Ped;
+			if (changed)
 			{
-				continue;
+				cop.Seen = false;
+				cop.LastSeen = -100.0;
 			}
-			float num = Vector3.Distance(cop5.Pos, member.Pos);
-			bool flag2 = CarOk(cop5.Car);
-			bool flag3 = false;
-			if (flag2 && cop5.Mode == 4)
+			if (now - cop.LastSeen >= 1.0)
 			{
-				N.GET_CAR_SPEED(cop5.Car, out var speed);
-				if (speed > 1.5f)
+				cop.LastSeen = now;
+				cop.Seen = CanSee(cop.Ped, cop.Pos, target.Ped, target.Pos);
+			}
+			ObserveCopMovement(cop, now, inCar);
+			if (inCar)
+			{
+				int driver = 0;
+				if (CarOk(cop.Car))
+					N.GET_DRIVER_OF_CAR(cop.Car, out driver);
+				cop.Driver = driver == cop.Ped;
+				if (driver == 0 && reservedDrivers.Contains(cop.Car) && CarOk(cop.Car))
+					continue;
+				if (cop.Mode == M_LEAVE_CAR || exitCars.Contains(cop.Car) || !CarOk(cop.Car) || driver == 0)
 				{
-					cop5.StillSince = -1.0;
+					if (cop.Mode != M_LEAVE_CAR || now - cop.LastTask > 8.0)
+					{
+						N._TASK_LEAVE_ANY_CAR(cop.Ped);
+						CopTask(cop, M_LEAVE_CAR, target.Ped, now);
+					}
+					continue;
 				}
-				else if (cop5.StillSince < 0.0)
+				if (cop.Driver)
 				{
-					cop5.StillSince = now;
+					int desired = target.InCar ? M_CHASE : M_DRIVE_TO;
+					double still = cop.StillSince < 0.0 ? 0.0 : now - cop.StillSince;
+					bool driving = cop.Mode == M_CHASE || cop.Mode == M_DRIVE_TO;
+					if (AiTaskPolicy.RefreshVehiclePursuit(driving, changed, cop.Mode != desired,
+						now - cop.LastTask, still))
+					{
+						N._TASK_CAR_MISSION_PED_TARGET(cop.Ped, cop.Car, target.Ped,
+							target.InCar ? 2u : 4u, target.InCar ? 30f : 18f, AiTaskPolicy.RoadDrivingStyle, 10u, 10u);
+						if (driving && !changed && cop.Mode == desired)
+							log("[NPC] patrulla " + cop.Car + " recupera ruta tras " + still.ToString("0") + " s detenida");
+						CopTask(cop, desired, target.Ped, now);
+					}
 				}
-				flag3 = cop5.StillSince > 0.0 && now - cop5.StillSince > 4.0 && now - cop5.ModeAt > 4.0;
-			}
-			if (!flag2 || num < 30f || flag3 || now - cop5.Spawned > 25.0)
-			{
-				hashSet2.Add(cop5.Car);
-			}
-		}
-		foreach (Cop cop6 in g.Cops)
-		{
-			if (!cop6.Alive)
-			{
+				else if (g.Lethal && distance <= CombatPolicy.ShootingRange)
+				{
+					if (changed || cop.Mode != M_DRIVEBY || (now - cop.LastShot > 12.0 && now - cop.LastTask > 12.0))
+					{
+						// Every patrol carries a pistol; rifles cannot fire from a car.
+						N.SET_CURRENT_CHAR_WEAPON(cop.Ped, 7, b: true);
+						N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(cop.Ped, v: false);
+						N.SET_CHAR_WILL_DO_DRIVEBYS(cop.Ped, v: true);
+						N._TASK_COMBAT(cop.Ped, target.Ped);
+						CopTask(cop, M_DRIVEBY, target.Ped, now);
+					}
+				}
+				else if (cop.Mode != M_RIDE)
+				{
+					if (cop.Mode == M_DRIVEBY)
+						N.CLEAR_CHAR_TASKS(cop.Ped);
+					CopTask(cop, M_RIDE, 0, now);
+				}
 				continue;
 			}
-			Member member2 = CopTarget(g, cop6);
-			if (member2 == null)
-			{
+			if (N.IS_PED_RAGDOLL(cop.Ped) || N.IS_CHAR_GETTING_UP(cop.Ped))
 				continue;
-			}
-			if (now - cop6.LastShot < 2.0)
+			// Finish re-entry, and leave a cooling period after exiting. Otherwise
+			// a moving suspect caused cops to alternate exit/entry every think.
+			if (cop.Mode == M_ENTER_CAR && CarOk(cop.Car) && now - cop.LastTask < 16.0)
+				continue;
+			if (cop.Mode == M_ENTER_CAR)
 			{
-				cop6.Fails = 0;
+				cop.EntryRetryAt = now + 25.0;
+				cop.Mode = M_NONE;
+				N.CLEAR_CHAR_TASKS(cop.Ped);
 			}
-			bool flag4 = N.IS_CHAR_IN_ANY_CAR(cop6.Ped);
-			float num2 = Vector3.Distance(cop6.Pos, member2.Pos);
-			bool flag5 = CarOk(cop6.Car);
-			bool inCar = member2.InCar;
-			if (cop6.Target != member2.Ped)
+			if (target.InCar && distance > 45f && now - cop.LastExit > 10.0 && now >= cop.EntryRetryAt
+				&& CarOk(cop.Car) && !reservedDrivers.Contains(cop.Car)
+				&& FlatDist(cop.Pos, G.CarPos(cop.Car)) < 30f)
 			{
-				cop6.Target = member2.Ped;
-				cop6.Seen = false;
-				cop6.LastSeen = -100.0;
-				if (cop6.Mode != 7 && cop6.Mode != 6)
+				N.GET_DRIVER_OF_CAR(cop.Car, out int driver);
+				if (driver == 0)
 				{
-					cop6.Mode = 0;
+					N._TASK_ENTER_CAR_AS_DRIVER(cop.Ped, cop.Car, 0u);
+					cop.Driver = true;
+					reservedDrivers.Add(cop.Car);
+					CopTask(cop, M_ENTER_CAR, target.Ped, now);
+					continue;
 				}
 			}
-			if (now - cop6.LastSeen > 1.0)
+			if (!g.Lethal)
 			{
-				cop6.LastSeen = now;
-				cop6.Seen = CanSee(cop6.Ped, cop6.Pos, member2.Ped, member2.Pos);
-			}
-			int num3 = ((flag4 && inCar && flag5) ? (cop6.Driver ? 8 : ((!g.Lethal || !(num2 < 45f)) ? 15 : 9)) : ((flag4 && !inCar && flag5 && !hashSet2.Contains(cop6.Car) && hashSet3.Contains(cop6.Car)) ? ((!cop6.Driver) ? 15 : 4) : (flag4 ? 7 : ((inCar && flag5 && FlatDist(cop6.Pos, G.CarPos(cop6.Car)) < 35f && num2 > 25f) ? 6 : (g.Lethal ? ((!(num2 > 40f) && (cop6.Mode != 3 || !(num2 > 28f))) ? 2 : 3) : ((!(num2 > 60f)) ? 21 : 3))))));
-			if (!flag4 && g.Lethal && (num3 == M_COMBAT || num3 == M_GOTO))
-			{
-				if (cop6.Mode == M_SHOOT && num2 <= CombatPolicy.ShootingRange && now - cop6.LastTask < cop6.PhaseLen)
-					num3 = M_SHOOT;
-				else if (cop6.Mode == M_COMBAT && num2 <= 60f && now - cop6.LastShot < 2.0)
-					num3 = M_COMBAT;
-			}
-			bool retryCombat = false;
-			if (!flag4 && g.Lethal && num3 == M_COMBAT)
-			{
-				if (cop6.Mode == M_SHOOT && now - cop6.LastTask < cop6.PhaseLen)
+				N.GET_CHAR_SPEED(target.Ped, out float suspectSpeed);
+				bool surrender = target.Mode == M_HANDS;
+				if (AiTaskPolicy.CanArrest(distance, target.InCar, surrender, suspectSpeed))
 				{
-					num3 = M_SHOOT;
-				}
-				else if (cop6.Mode == M_GOTO && !cop6.Seen && num2 > 10f && now - cop6.ModeAt < 3.0)
-				{
-					num3 = M_GOTO;
+					if (changed || cop.Mode != M_ARREST || now - cop.LastTask >= 8.0)
+					{
+						N._TASK_CHAR_ARREST_CHAR(cop.Ped, target.Ped);
+						CopTask(cop, M_ARREST, target.Ped, now);
+					}
 				}
 				else
-				{
-					CombatPolicy.Recovery recovery = CombatPolicy.Decide(true,
-						cop6.Mode != M_COMBAT, N.IS_PED_IN_COMBAT(cop6.Ped),
-						cop6.Seen, num2, now - cop6.LastTask, now - cop6.LastShot);
-					if (recovery == CombatPolicy.Recovery.Shoot)
-						num3 = M_SHOOT;
-					else if (recovery == CombatPolicy.Recovery.Advance)
-						num3 = M_GOTO;
-					else if (recovery == CombatPolicy.Recovery.Engage)
-						retryCombat = true;
-				}
-			}
-			bool flag6 = num3 != cop6.Mode || retryCombat;
-			if (!flag6 && num3 == 3)
-			{
-				flag6 = now - cop6.LastTask > 3.0;
-			}
-			if (!flag6 && num3 == 21)
-			{
-				flag6 = now - cop6.LastTask > 10.0;
-			}
-			if (!flag6 && num3 == 6)
-			{
-				flag6 = now - cop6.LastTask > 8.0;
-			}
-			if (!flag6 && num3 == 8)
-			{
-				N.GET_CAR_SPEED(cop6.Car, out var speed2);
-				if (speed2 > 1.5f)
-				{
-					cop6.StillSince = -1.0;
-				}
-				else if (cop6.StillSince < 0.0)
-				{
-					cop6.StillSince = now;
-				}
-				else if (now - cop6.StillSince > 6.0)
-				{
-					flag6 = true;
-				}
-			}
-			if (!flag6 && num3 == 2)
-			{
-				flag6 = now - cop6.LastTask > 8.0 && !N.IS_PED_IN_COMBAT(cop6.Ped);
-			}
-			if (!flag6 && num3 == 7 && now - cop6.ModeAt > 4.0)
-			{
-				num3 = ((!g.Lethal) ? 21 : 2);
-				flag6 = true;
-			}
-			if (!flag6)
-			{
+					CopRunTo(cop, target, now, changed);
 				continue;
 			}
-			Block(cop6, on: true);
-			switch (num3)
-			{
-			case 15:
-				cop6.Mode = 15;
-				continue;
-			case 8:
-				N._TASK_CAR_MISSION_PED_TARGET(cop6.Ped, cop6.Car, member2.Ped, 2u, 40f, 2u, 10u, 10u);
-				break;
-			case 9:
-				N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(cop6.Ped, v: false);
-				N.SET_CHAR_WILL_DO_DRIVEBYS(cop6.Ped, v: true);
-				N._TASK_COMBAT(cop6.Ped, member2.Ped);
-				break;
-			case 4:
-				N._TASK_CAR_MISSION_PED_TARGET(cop6.Ped, cop6.Car, member2.Ped, 4u, 20f, 2u, 15u, 10u);
-				break;
-			case 7:
-				N._TASK_LEAVE_ANY_CAR(cop6.Ped);
-				break;
-			case 21:
-				N._TASK_CHAR_ARREST_CHAR(cop6.Ped, member2.Ped);
-				break;
-			case 6:
-				if (cop6.Driver)
-				{
-					N._TASK_ENTER_CAR_AS_DRIVER(cop6.Ped, cop6.Car, 0u);
-				}
-				else
-				{
-					N._TASK_ENTER_CAR_AS_PASSENGER(cop6.Ped, cop6.Car, 0u, 0u);
-				}
-				break;
-			case 3:
-			{
-				bool flag7 = cop6.Mode == 3 && now - cop6.ModeAt > 3.0;
-				N.GET_CHAR_SPEED(cop6.Ped, out var v);
-				if (flag7 && v < 0.5f)
-				{
-					N._TASK_GO_STRAIGHT_TO_COORD(cop6.Ped, member2.Pos, 4);
-				}
-				else
-				{
-					N._TASK_FOLLOW_NAV_MESH_TO_COORD(cop6.Ped, member2.Pos, 4);
-				}
-				break;
-			}
-			case 10:
-			{
-				int num4 = (int)(G.Rand(3f, 5f) * 1000f);
-				N._TASK_SHOOT_AT_CHAR(cop6.Ped, member2.Ped, num4, 4);
-				cop6.PhaseLen = (double)num4 / 1000.0;
-				break;
-			}
-			case 19:
-			{
-				float side = G.Rand(3f, 6f) * ((G.Rng.Next(2) != 0) ? 1f : (-1f));
-				N._TASK_GO_STRAIGHT_TO_COORD(cop6.Ped, Ground(GangRules.Strafe(cop6.Pos, member2.Pos, side, G.Rand(0f, 3f)), cop6.Pos.Z), 4);
-				break;
-			}
-			default:
-				N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(cop6.Ped, v: true);
-				N._TASK_COMBAT(cop6.Ped, member2.Ped);
-				break;
-			}
-			if (num3 != cop6.Mode || num3 == 10 || num3 == 3)
-			{
-				cop6.ModeAt = ((num3 != 3 || cop6.Mode != 3) ? now : cop6.ModeAt);
-			}
-			cop6.Mode = num3;
-			cop6.LastTask = now;
-			if (num3 != 8)
-			{
-				cop6.StillSince = -1.0;
-			}
+			FightCop(cop, target, now, changed, distance);
 		}
 		ManageAmbientCops(g, now);
+	}
+
+	private static void ObserveCopMovement(Cop cop, double now, bool inCar)
+	{
+		float speed;
+		if (inCar && cop.Car != 0 && N.DOES_VEHICLE_EXIST(cop.Car))
+			N.GET_CAR_SPEED(cop.Car, out speed);
+		else
+			N.GET_CHAR_SPEED(cop.Ped, out speed);
+		if (speed >= (inCar ? 1.5f : 0.4f))
+			cop.StillSince = -1.0;
+		else if (cop.StillSince < 0.0)
+			cop.StillSince = now;
+	}
+
+	private void CopTask(Cop cop, int mode, int target, double now)
+	{
+		if (cop.Mode != mode)
+		{
+			cop.ModeAt = now;
+			cop.StillSince = -1.0;
+		}
+		cop.Mode = mode;
+		cop.Target = target;
+		cop.LastTask = now;
+		Block(cop, !(UseGameAi && (mode == M_COMBAT || mode == M_DRIVEBY)));
+	}
+
+	private void CopRunTo(Cop cop, Member target, double now, bool changed)
+	{
+		double still = cop.StillSince < 0.0 ? 0.0 : now - cop.StillSince;
+		if (!changed && cop.Mode == M_GOTO && !AiTaskPolicy.RefreshPath(now - cop.LastTask,
+			FlatDist(cop.MoveTo, target.Pos), still, FlatDist(cop.Pos, cop.MoveTo) < 2f))
+			return;
+		if (still >= 4.0)
+			N._TASK_GO_STRAIGHT_TO_COORD(cop.Ped, target.Pos, 4);
+		else
+			N._TASK_FOLLOW_NAV_MESH_TO_COORD(cop.Ped, target.Pos, 4);
+		CopTask(cop, M_GOTO, target.Ped, now);
+		cop.MoveTo = target.Pos;
+	}
+
+	private void FightCop(Cop cop, Member target, double now, bool changed, float distance)
+	{
+		if (distance > CombatPolicy.SightRange)
+		{
+			CopRunTo(cop, target, now, changed);
+			return;
+		}
+		if (!changed && cop.Mode == M_SHOOT && now - cop.LastTask < cop.PhaseLen)
+			return;
+		if (!changed && cop.Mode == M_GOTO && !cop.Seen && now - cop.LastTask < 3.0
+			&& FlatDist(cop.Pos, cop.MoveTo) > 2f)
+			return;
+		N.GET_CHAR_SPEED(cop.Ped, out float speed);
+		CombatPolicy.Recovery recovery = CombatPolicy.Decide(true, changed || cop.Mode != M_COMBAT,
+			N.IS_PED_IN_COMBAT(cop.Ped), cop.Seen, distance, now - cop.LastTask,
+			now - cop.LastShot, speed, N.IS_PED_IN_COVER(cop.Ped) || N.IS_CHAR_DUCKING(cop.Ped), UseGameAi);
+		switch (recovery)
+		{
+		case CombatPolicy.Recovery.Keep:
+			return;
+		case CombatPolicy.Recovery.Advance:
+			CopRunTo(cop, target, now, changed);
+			return;
+		case CombatPolicy.Recovery.Shoot:
+			cop.PhaseLen = 3.5;
+			N._TASK_SHOOT_AT_CHAR(cop.Ped, target.Ped, 3500, 4);
+			CopTask(cop, M_SHOOT, target.Ped, now);
+			return;
+		default:
+			N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(cop.Ped, v: true);
+			N._TASK_COMBAT(cop.Ped, target.Ped);
+			CopTask(cop, M_COMBAT, target.Ped, now);
+			return;
+		}
 	}
 
 	private void ManageAmbientCops(Gang g, double now)
@@ -4433,12 +4585,19 @@ public class SubNpcManager
 						owned = true;
 				if (owned)
 					continue;
+				int car = 0;
+				if (N.IS_CHAR_IN_ANY_CAR(ped))
+					N.GET_CAR_CHAR_IS_USING(ped, out car);
+				if (AmbientVehicleTaken(g, car))
+					continue;
 				// Keep the real cop's relationship group and vehicle ownership intact.
 				N.SET_CHAR_RELATIONSHIP(ped, 5u, g.Group);
 				N.SET_CHAR_KEEP_TASK(ped, v: true);
 				N.SET_CHAR_WILL_USE_COVER(ped, v: true);
+				N.SET_CHAR_WILL_ONLY_FIRE_WITH_CLEAR_LOS(ped, true);
+				N.SET_CHAR_WILL_USE_CARS_IN_COMBAT(ped, v: true);
 				N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(ped, v: true);
-				g.AmbientCops[ped] = new Cop { Ped = ped, Spawned = now, Pos = G.CharPos(ped) };
+				g.AmbientCops[ped] = new Cop { Ped = ped, Car = car, Spawned = now, Pos = G.CharPos(ped) };
 				ambientCount++;
 				g.Tasked.Add(ped);
 			}
@@ -4472,40 +4631,77 @@ public class SubNpcManager
 				c.LastSeen = now;
 				c.Seen = CanSee(c.Ped, c.Pos, target.Ped, target.Pos);
 			}
-			if (!changed && c.Mode == M_SHOOT && now - c.LastTask < c.PhaseLen)
-				continue;
-			if (!changed && c.Mode == M_GOTO && now - c.LastTask < 3.0)
-				continue;
-			CombatPolicy.Recovery recovery = CombatPolicy.Decide(true,
-				changed || c.Mode != M_COMBAT, N.IS_PED_IN_COMBAT(c.Ped),
-				c.Seen, distance, now - c.LastTask, now - c.LastShot);
-			if (recovery == CombatPolicy.Recovery.Keep)
-				continue;
-			if (!changed && recovery == CombatPolicy.Recovery.Advance && now - c.LastTask < 3.0)
-				continue;
-			Block(c, on: true);
-			if (recovery == CombatPolicy.Recovery.Advance && !N.IS_CHAR_IN_ANY_CAR(c.Ped))
+			bool inCar = N.IS_CHAR_IN_ANY_CAR(c.Ped);
+			if (inCar)
+				N.GET_CAR_CHAR_IS_USING(c.Ped, out c.Car);
+			if (inCar && AmbientVehicleTaken(g, c.Car))
 			{
-				N._TASK_FOLLOW_NAV_MESH_TO_COORD(c.Ped, target.Pos, 4);
-				c.Mode = M_GOTO;
+				ReleaseAmbientCop(g, c);
+				released.Add(c.Ped);
+				g.Tasked.Remove(c.Ped);
+				continue;
 			}
-			else if (recovery == CombatPolicy.Recovery.Shoot && !N.IS_CHAR_IN_ANY_CAR(c.Ped))
+			if (!inCar && c.WasInCar)
 			{
-				c.PhaseLen = 3.5;
-				N._TASK_SHOOT_AT_CHAR(c.Ped, target.Ped, 3500, 4);
-				c.Mode = M_SHOOT;
+				c.Mode = M_NONE;
+				c.StillSince = -1.0;
 			}
-			else
+			c.WasInCar = inCar;
+			ObserveCopMovement(c, now, inCar);
+			if (N.IS_PED_RAGDOLL(c.Ped) || N.IS_CHAR_GETTING_UP(c.Ped))
+				continue;
+			if (inCar)
 			{
-				N._TASK_COMBAT(c.Ped, target.Ped);
-				c.Mode = M_COMBAT;
+				N.GET_DRIVER_OF_CAR(c.Car, out int driver);
+				c.Driver = driver == c.Ped;
+				if (driver == 0)
+				{
+					if (c.Mode != M_LEAVE_CAR || now - c.LastTask >= 8.0)
+					{
+						N._TASK_LEAVE_ANY_CAR(c.Ped);
+						CopTask(c, M_LEAVE_CAR, target.Ped, now);
+					}
+					continue;
+				}
+				// One gang owns the whole patrol. The driver decides when to exit;
+				// passengers can shoot without asking the driver to stop for them.
+				int mode = c.Driver ? M_COMBAT : M_DRIVEBY;
+				if (changed || c.Mode != mode || (!N.IS_PED_IN_COMBAT(c.Ped) && now - c.LastTask >= 14.0))
+				{
+					if (!c.Driver)
+					{
+						N.GIVE_WEAPON_TO_CHAR(c.Ped, 7, 300, b: false);
+						N.SET_CURRENT_CHAR_WEAPON(c.Ped, 7, b: true);
+						N.SET_CHAR_WILL_DO_DRIVEBYS(c.Ped, v: true);
+					}
+					N.SET_CHAR_WILL_LEAVE_CAR_IN_COMBAT(c.Ped, v: c.Driver);
+					N._TASK_COMBAT(c.Ped, target.Ped);
+					CopTask(c, mode, target.Ped, now);
+				}
+				continue;
 			}
-			c.Target = target.Ped;
-			c.ModeAt = now;
-			c.LastTask = now;
+			FightCop(c, target, now, changed, distance);
 		}
 		foreach (int ped in released)
 			g.AmbientCops.Remove(ped);
+	}
+
+	private bool AmbientVehicleTaken(Gang owner, int car)
+	{
+		if (car == 0)
+			return false;
+		foreach (Gang other in gangs)
+		{
+			foreach (Cop cop in other.Cops)
+				if (cop.Alive && cop.Car == car)
+					return true;
+			if (other == owner)
+				continue;
+			foreach (Cop cop in other.AmbientCops.Values)
+				if (cop.Alive && cop.Car == car)
+					return true;
+		}
+		return false;
 	}
 
 	private static void ReleaseAmbientCop(Gang g, Cop c)
@@ -4553,7 +4749,9 @@ public class SubNpcManager
 		{
 			return member;
 		}
-		return (!(Vector3.Distance(member2.Pos, c.Pos) < Vector3.Distance(member.Pos, c.Pos) + 15f)) ? member : member2;
+		return AiTaskPolicy.KeepPoliceTarget(N.IS_CHAR_IN_ANY_CAR(c.Ped),
+			Vector3.Distance(member2.Pos, c.Pos), Vector3.Distance(member.Pos, c.Pos), G.Now - c.LastTask)
+			? member2 : member;
 	}
 
 	private bool Cleanup(Gang g, double now)
@@ -4620,6 +4818,10 @@ public class SubNpcManager
 					break;
 				}
 			}
+			foreach (Gang other in gangs)
+				foreach (Cop cop in AllCops(other))
+					if (cop.Alive && cop.Car == key)
+						flag4 = true;
 			if (flag4)
 			{
 				continue;

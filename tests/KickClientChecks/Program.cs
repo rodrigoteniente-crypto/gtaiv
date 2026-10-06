@@ -8,6 +8,24 @@ void Check(bool condition, string name)
     checks++;
 }
 
+string configFolder = Path.Combine(Path.GetTempPath(), "kickchaos-ai-" + Guid.NewGuid());
+Directory.CreateDirectory(configFolder);
+try
+{
+    string path = Path.Combine(configFolder, "config.ini");
+    File.WriteAllText(path, "[Suscriptor]\n");
+    var loaded = Config.Load(configFolder, new List<string>());
+    Check(loaded.UseGameAi, "an existing config without IA defaults to game AI");
+    Check(loaded.KeyFollowNpc == System.Windows.Forms.Keys.F4, "manual NPC camera defaults to F4");
+    File.WriteAllText(path, "[Suscriptor]\nIA = Mod\n");
+    Check(!Config.Load(configFolder, new List<string>()).UseGameAi, "explicit Mod mode survives config reload");
+    File.WriteAllText(path, "[Suscriptor]\nIA = juego\n[Teclas]\nSeguirNpc = F5\n");
+    loaded = Config.Load(configFolder, new List<string>());
+    Check(loaded.UseGameAi, "persisted game mode is case insensitive");
+    Check(loaded.KeyFollowNpc == System.Windows.Forms.Keys.F5, "manual NPC camera shortcut can be customized");
+}
+finally { Directory.Delete(configFolder, true); }
+
 string Frame(string name, string data, bool encoded = false, string channel = "chatrooms.1.v2") =>
     "{\"event\":" + Json.Quote("App\\Events\\" + name) + ",\"channel\":" + Json.Quote(channel) +
     ",\"data\":" + (encoded ? Json.Quote(data) : data) + "}";
@@ -99,4 +117,4 @@ for (int attempt = 0; attempt < 2; attempt++)
     Check(elapsed.ElapsedMilliseconds < 3500 && !failingClient.Connected && failingClient.Status == "detenido",
         "failed-connection worker cancels promptly and can restart");
 }
-Console.WriteLine($"PASS: {checks} Kick parsing, recipient mapping, cooldown, queue and lifecycle checks.");
+Console.WriteLine($"PASS: {checks} Kick parsing, recipient mapping, config, cooldown, queue and lifecycle checks.");

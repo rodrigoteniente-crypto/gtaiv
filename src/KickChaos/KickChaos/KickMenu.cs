@@ -319,6 +319,18 @@ public class KickMenu
 			},
 			new MenuItem
 			{
+				Label = "Cambiar a cámara de NPC",
+				OnEnter = FollowNpcCamera,
+				Help = () => "Sigue al NPC hasta que cambies o muera. Cada pulsacion pasa al siguiente vivo. Tecla: " + Cfg.KeyFollowNpc
+			},
+			new MenuItem
+			{
+				Label = "Volver al loop de cámaras",
+				OnEnter = delegate { Dir.ReturnToCameraLoop(); },
+				Help = () => "Sale del seguimiento manual. Tecla: " + Cfg.KeyNextCam
+			},
+			new MenuItem
+			{
 				Label = "Escenas y transiciones",
 				Submenu = Scenes,
 				Help = () => "Cuanto dura cada escena, fundido o corte, zoom, movimiento..."
@@ -417,6 +429,12 @@ public class KickMenu
 		{
 			Dir.ToggleEditor();
 		}
+	}
+
+	private void FollowNpcCamera()
+	{
+		if (host.FollowNpcCamera()) Menu.Close();
+		else Menu.Toast("No hay NPC de suscriptores vivos");
 	}
 
 	private int CountActive()
@@ -1114,6 +1132,13 @@ public class KickMenu
 				Info = true,
 				DynamicLabel = () => "En la calle: " + ((host.Npcs == null) ? "-" : host.Npcs.Describe())
 			},
+			Choice("IA de los NPC", "Suscriptor", "IA", new string[2] { "Mod", "Juego" }, new string[2] { "IA del mod", "IA del juego" }, "Juego", "Se aplica tambien a los NPC vivos. Juego: deja que el juego maneje combate, cobertura y reacciones. Mod: controla las acciones y ayuda a salir de atascos"),
+			new MenuItem
+			{
+				Label = "Cambiar a cámara de NPC",
+				OnEnter = FollowNpcCamera,
+				Help = () => "Pasa al siguiente NPC vivo y lo sigue sin cortar por tiempo. Tecla: " + Cfg.KeyFollowNpc
+			},
 			new MenuItem
 			{
 				Label = "Aparece con cada sub",
@@ -1388,6 +1413,18 @@ public class KickMenu
 	{
 		return new MenuPage("Camara que lo sigue", () => new List<MenuItem>
 		{
+			new MenuItem
+			{
+				Label = "Cambiar a cámara de NPC",
+				OnEnter = FollowNpcCamera,
+				Help = () => "Seguimiento manual persistente. Tecla: " + Cfg.KeyFollowNpc
+			},
+			new MenuItem
+			{
+				Label = "Volver al loop de cámaras",
+				OnEnter = delegate { Dir.ReturnToCameraLoop(); },
+				Help = () => "Tecla: " + Cfg.KeyNextCam
+			},
 			Bool("Ir a su camara al aparecer", "Suscriptor", "IrAlAparecer", def: true, "La camara se va con el apenas aparece (con fundido)"),
 			Num("Chance de su camara", "Suscriptor", "CamaraChance", 50f, 0f, 100f, 5f, (float v) => v.ToString("0") + "%", "Mientras este vivo, en cada cambio de camara hay esta chance de que la proxima sea la suya (prefiere a los que estan a los tiros). Si no, se elige una de tus camaras, con mas chance las que estan cerca del lio"),
 			Num("Duracion de su toma", "Suscriptor", "CamaraDuracion", 30f, 5f, 300f, 5f, Sec, "Si muere antes, la toma termina unos segundos despues"),
@@ -1692,6 +1729,7 @@ public class KickMenu
 			KeyItem("Prender / apagar el director", "Director", (Keys)120, string.Empty),
 			KeyItem("Camara libre (crear camaras)", "Editor", (Keys)118, string.Empty),
 			KeyItem("Siguiente camara", "SiguienteCamara", (Keys)117, string.Empty),
+			KeyItem("Cambiar a cámara de NPC", "SeguirNpc", Keys.F4, "Cada pulsacion pasa al siguiente NPC vivo. Siguiente camara vuelve al loop"),
 			KeyItem("Recargar archivos", "Recargar", (Keys)116, string.Empty),
 			new MenuItem
 			{

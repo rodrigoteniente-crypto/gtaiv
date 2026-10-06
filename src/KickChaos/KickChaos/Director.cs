@@ -76,6 +76,8 @@ public class Director
 
 	private bool pendingForced;
 
+	private readonly NpcCameraLock npcCameraLock = new NpcCameraLock();
+
 	private bool switchFade = true;
 
 	private bool forceFade;
@@ -240,6 +242,8 @@ public class Director
 
 	public int FollowedPed => FollowingNpc ? Current.FollowPed : 0;
 
+	public bool ManualNpcCamera => npcCameraLock.Active;
+
 	public Director(Config cfg, Action<string> log, Action<string, uint> subtitle)
 	{
 		this.log = log;
@@ -258,8 +262,8 @@ public class Director
 		defDuration = MathX.Clamp(ini.GetFloat("Director", "DuracionPorDefecto", 20f), 3f, 86400f, 20f);
 		defFov = MathX.Clamp(ini.GetFloat("Director", "FOVPorDefecto", 25f), 3f, 120f, 25f);
 		fade = !Config.Normalize(ini.Get("Director", "Transicion", "fundido")).StartsWith("corte");
-		fadeMs = Math.Max(0, ini.GetInt("Director", "FundidoMs", 500));
-		loadMs = Math.Max(0, ini.GetInt("Director", "EsperaCargaMs", 1500));
+		fadeMs = Math.Max(0, Math.Min(3000, ini.GetInt("Director", "FundidoMs", 500)));
+		loadMs = Math.Max(0, Math.Min(10000, ini.GetInt("Director", "EsperaCargaMs", 1500)));
 		sway = MathX.Clamp(ini.GetFloat("Director", "Balanceo", 0.25f), 0f, 20f, 0.25f);
 		anchorHeight = MathX.Clamp(ini.GetFloat("Director", "AlturaJugadorOculto", 20f), 0f, 500f, 20f);
 		holdAfterAction = MathX.Clamp(ini.GetFloat("Director", "NoCortarTrasAccion", 8f), 0f, 3600f, 8f);
@@ -325,7 +329,10 @@ public class Director
 			HidePlayer(returnPos + new Vector3(0f, 0f, anchorHeight));
 			N.DISPLAY_HUD(v: false);
 			N.DISPLAY_RADAR(v: false);
-			N.SET_MAX_WANTED_LEVEL(0u);
+			// The spectator is ignored individually; do not disable the city's
+			// wanted/police system globally while subscriber NPCs are active.
+			N.SET_MAX_WANTED_LEVEL(6u);
+			lastIgnoreApply = -100.0;
 			N.CLEAR_WANTED_LEVEL(G.PlayerIndex);
 			log("Director encendido (" + Shots.Count + " camaras guardadas, modo " + mode + ")");
 			N.DO_SCREEN_FADE_OUT(0u);
@@ -335,6 +342,7 @@ public class Director
 
 	public void Stop()
 	{
+		npcCameraLock.Release();
 		if (Active)
 		{
 			Active = false;
@@ -351,6 +359,7 @@ public class Director
 
 	public void QuickTeardown(bool loadScene = false)
 	{
+		npcCameraLock.Release();
 		if (Active || EditorActive)
 		{
 			Active = false;
@@ -366,6 +375,7 @@ public class Director
 
 	public void ForgetState()
 	{
+		npcCameraLock.Release();
 		Active = false;
 		EditorActive = false;
 		PoliceMode = false;
@@ -416,7 +426,51 @@ public class Director
 
 	public void Next()
 	{
+		if (ManualNpcCamera || FollowingNpc)
+		{
+			ReturnToCameraLoop();
+			return;
+		}
 		requestNext = true;
+	}
+
+	public void ReturnToCameraLoop()
+	{
+		npcCameraLock.ReturnToLoop();
+		ClearPending();
+		requestNext = Active;
+		log("Camara manual de NPC: vuelta al loop");
+	}
+
+	private bool LiveCameraTarget(int ped)
+	{
+		return ped != 0 && Npcs != null && N.DOES_CHAR_EXIST(ped) && !N.IS_CHAR_DEAD(ped)
+			&& !N.IS_CHAR_FATALLY_INJURED(ped) && Npcs.FollowInfo(ped, out var _, out var _, out var dead) && !dead;
+	}
+
+	public bool FollowNextNpc()
+	{
+		int previous = ManualNpcCamera ? npcCameraLock.Ped : FollowedPed;
+		bool wasManual = ManualNpcCamera;
+		int ped = Npcs == null ? 0 : npcCameraLock.Cycle(previous, Npcs.NextForCamera, LiveCameraTarget);
+		if (ped == 0)
+		{
+			if (wasManual) ReturnToCameraLoop();
+			subtitle("No hay NPC de suscriptores vivos para seguir", 2500u);
+			return false;
+		}
+		QueueFollow(ped);
+		log("Camara manual de NPC: siguiendo ped=" + ped);
+		return true;
+	}
+
+	private void QueueFollow(int ped)
+	{
+		pendingShot = MakeFollowShot(ped);
+		pendingChosen = true;
+		pendingForced = true;
+		if (!Active) Start();
+		else requestNext = true;
 	}
 
 	public void RepairSoon()
@@ -577,6 +631,11 @@ public class Director
 				break;
 			case Phase.Showing:
 			{
+				if (ManualNpcCamera && !LiveCameraTarget(npcCameraLock.Ped))
+				{
+					// No corpse/deleted handle can retain a manual camera indefinitely.
+					FollowNextNpc();
+				}
 				if (Current != null && Current.IsFollow)
 				{
 					bool inCar = false;
@@ -622,7 +681,7 @@ public class Director
 						}
 					}
 				}
-				bool flag2 = now - shotStart >= (double)shotDuration;
+				bool flag2 = !ManualNpcCamera && now - shotStart >= (double)shotDuration;
 				bool flag3 = now < holdUntil || PoliceMode || actionsPending;
 				if (now > shotStart + (double)shotDuration + (double)maxHold)
 				{
@@ -659,8 +718,11 @@ public class Director
 	{
 		ForceCamActive();
 		DoSwitch();
+		if (!Active) return;
 		phase = Phase.Loading;
-		phaseStart = G.Now;
+		// An NPC can disappear during the switch itself. Retry on the next
+		// frame rather than holding a black loading screen for three seconds.
+		phaseStart = Current == null ? G.Now - 3.1 : G.Now;
 		requestNext = false;
 		holdUntil = -1.0;
 	}
@@ -688,7 +750,7 @@ public class Director
 		{
 			N.SET_EVERYONE_IGNORE_PLAYER(playerIndex, flag);
 			N.SET_POLICE_IGNORE_PLAYER(playerIndex, flag);
-			N.SET_MAX_WANTED_LEVEL(flag ? 0u : 6u);
+			N.SET_MAX_WANTED_LEVEL(6u);
 			lastIgnore = flag;
 			lastIgnoreApply = G.Now;
 		}
@@ -801,7 +863,8 @@ public class Director
 		CameraShot cameraShot = PickNext();
 		if (cameraShot == null)
 		{
-			log("No se pudo armar un plano; se reintenta.");
+			log("No se pudo armar un plano; se restaura la camara del juego.");
+			Stop();
 			return;
 		}
 		Current = cameraShot;
@@ -810,10 +873,12 @@ public class Director
 		fGoneAt = -1.0;
 		if (cameraShot.IsFollow)
 		{
-			if (Npcs == null || !Npcs.FollowInfo(cameraShot.FollowPed, out var pos, out var inCar, out var _))
+			if (!LiveCameraTarget(cameraShot.FollowPed) || !Npcs.FollowInfo(cameraShot.FollowPed, out var pos, out var inCar, out var dead) || dead)
 			{
-				pos = CurrentTarget;
-				inCar = false;
+				Current = null;
+				ClearPending();
+				requestNext = true;
+				return;
 			}
 			MovePlayer(pos + new Vector3(0f, 0f, anchorHeight));
 			N.REQUEST_COLLISION_AT_POSN(pos);
@@ -865,6 +930,7 @@ public class Director
 			}
 		}
 		ReapplyWeather();
+		npcCameraLock.CameraApplied(cameraShot.IsFollow);
 		switchCount++;
 		ApplyCamera(G.Now);
 	}
@@ -951,7 +1017,24 @@ public class Director
 
 	private void ChoosePending()
 	{
-		if (Npcs != null && followChance > 0f)
+		if (ManualNpcCamera)
+		{
+			if (Npcs == null) npcCameraLock.Release();
+			else if (!LiveCameraTarget(npcCameraLock.Ped))
+			{
+				npcCameraLock.Cycle(npcCameraLock.Ped, Npcs.NextForCamera, LiveCameraTarget);
+			}
+			if (ManualNpcCamera)
+			{
+				pendingShot = MakeFollowShot(npcCameraLock.Ped);
+				pendingChosen = true;
+				pendingForced = true;
+				return;
+			}
+			npcCameraLock.ReturnToLoop();
+		}
+		bool allowFollow = npcCameraLock.AllowsAutomaticFollow;
+		if (allowFollow && Npcs != null && followChance > 0f)
 		{
 			int exclude = ((Current != null && Current.IsFollow) ? Current.FollowPed : 0);
 			int num = Npcs.PickForCamera(exclude);
@@ -982,7 +1065,7 @@ public class Director
 		{
 			if (pendingShot.IsFollow)
 			{
-				if (Npcs == null || !Npcs.FollowInfo(pendingShot.FollowPed, out var _, out var _, out var dead) || dead)
+				if (!LiveCameraTarget(pendingShot.FollowPed))
 				{
 					ClearPending();
 				}
@@ -1030,6 +1113,7 @@ public class Director
 	{
 		if (shotIndex >= 0 && shotIndex < Shots.Count)
 		{
+			npcCameraLock.Release();
 			pendingShot = Shots[shotIndex];
 			pendingChosen = true;
 			pendingForced = true;
@@ -1058,7 +1142,7 @@ public class Director
 
 	public void FollowNow(int ped)
 	{
-		if (Active && !EditorActive && ped != 0)
+		if (Active && !EditorActive && npcCameraLock.AllowsAutomaticFollow && LiveCameraTarget(ped))
 		{
 			pendingShot = MakeFollowShot(ped);
 			pendingChosen = true;
@@ -1903,7 +1987,7 @@ public class Director
 		{
 			return "apagado";
 		}
-		string text = ((Current == null) ? "-" : (Current.IsFollow ? "siguiendo a un NPC" : ((!Current.IsAuto) ? Current.Name : "automatica")));
+		string text = ((Current == null) ? "-" : (Current.IsFollow ? (ManualNpcCamera ? "NPC manual (" + cfg.KeyNextCam + " vuelve al loop)" : "siguiendo a un NPC") : ((!Current.IsAuto) ? Current.Name : "automatica")));
 		return "encendido, plano: " + text + ", fase " + phase;
 	}
 }

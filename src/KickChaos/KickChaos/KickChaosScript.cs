@@ -12,7 +12,7 @@ namespace KickChaos;
 
 public class KickChaosScript : Script
 {
-	public const string Version = "1.6.2-community";
+	public const string Version = "1.6.3-community";
 
 	private Config cfg;
 
@@ -202,6 +202,13 @@ public class KickChaosScript : Script
 			director.Start();
 		}
 		autoStarted = true;
+	}
+
+	internal bool FollowNpcCamera()
+	{
+		bool following = director.FollowNextNpc();
+		if (following) autoStarted = true;
+		return following;
 	}
 
 	internal void SimulateChat(string user, string text)
@@ -448,7 +455,7 @@ public class KickChaosScript : Script
 		}
 		// GTA emits repeated key-down events while a key is held. Debounce toggles
 		// without slowing down menu navigation or the free-camera movement keys.
-		if (val == cfg.KeyMenu || val == cfg.KeyReload || val == cfg.KeyDirector || val == cfg.KeyEditor || val == cfg.KeyNextCam)
+		if (val == cfg.KeyMenu || val == cfg.KeyReload || val == cfg.KeyDirector || val == cfg.KeyEditor || val == cfg.KeyNextCam || val == cfg.KeyFollowNpc)
 		{
 			double previous;
 			if (lastShortcutAt.TryGetValue(val, out previous) && G.Now - previous < 0.6) return;
@@ -505,6 +512,10 @@ public class KickChaosScript : Script
 				{
 					director.Next();
 				}
+			}
+			else if (val == cfg.KeyFollowNpc)
+			{
+				FollowNpcCamera();
 			}
 			else if (val == cfg.KeyReload)
 			{
@@ -663,6 +674,12 @@ public class KickChaosScript : Script
 		case "siguiente":
 			director.Next();
 			break;
+		case "seguirnpc":
+			FollowNpcCamera();
+			break;
+		case "loop":
+			director.ReturnToCameraLoop();
+			break;
 		case "aqui":
 		case "centro":
 			director.SetHubHere();
@@ -673,7 +690,7 @@ public class KickChaosScript : Script
 			break;
 		default:
 			Print("kick estado | kick chat <usuario> <mensaje> | kick sub | kick regalo <n> | kick follow | kick host | kick npc <meses>");
-			Print("kick accion <Accion> | kick acciones | kick director | kick editor | kick camara | kick aqui | kick recargar");
+			Print("kick accion <Accion> | kick acciones | kick director | kick editor | kick camara | kick seguirnpc | kick loop | kick aqui | kick recargar");
 			break;
 		}
 	}

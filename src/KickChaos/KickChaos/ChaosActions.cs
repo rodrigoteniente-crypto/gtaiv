@@ -406,7 +406,7 @@ public class ChaosActions
 		dir.PoliceMode = false;
 		if (dir.Active)
 		{
-			N.SET_MAX_WANTED_LEVEL(0u);
+			N.SET_MAX_WANTED_LEVEL(6u);
 			N.SET_POLICE_IGNORE_PLAYER(playerIndex, v: true);
 			N.SET_EVERYONE_IGNORE_PLAYER(playerIndex, v: true);
 		}

@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../src/KickChaos/KickChaos/CombatPolicy.cs" Link="CombatPolicy.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/AiTaskPolicy.cs" Link="AiTaskPolicy.cs" />
   </ItemGroup>
 </Project>

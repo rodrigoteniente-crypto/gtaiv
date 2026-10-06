@@ -26,7 +26,7 @@ entries["Codigo-fuente/.gitignore"] = ROOT / ".gitignore"
 for filename, path in entries.items():
     if not path.is_file():
         raise SystemExit(f"Falta {path}: compilar antes de empaquetar")
-output = ROOT / "dist/KickChaos-IV-corregido.zip"
+output = ROOT / "dist/KickChaos-IV-1.6.3.zip"
 output.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     hashes = []

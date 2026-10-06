@@ -9,6 +9,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="ConfigStub.cs" />
     <Compile Include="../../src/KickChaos/KickChaos/CameraShot.cs" Link="Production/CameraShot.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/NpcCameraLock.cs" Link="Production/NpcCameraLock.cs" />
     <Compile Include="../../src/KickChaos/KickChaos/CameraStore.cs" Link="Production/CameraStore.cs" />
     <Compile Include="../../src/KickChaos/KickChaos/MathX.cs" Link="Production/MathX.cs" />
     <Compile Include="../../src/KickChaos/KickChaos/IniFile.cs" Link="Production/IniFile.cs" />

@@ -63,6 +63,10 @@ public class Config
 
 	public Keys KeyNextCam = (Keys)117;
 
+	public Keys KeyFollowNpc = Keys.F4;
+
+	public bool UseGameAi;
+
 	public Keys KeyReload = (Keys)116;
 
 	public readonly Dictionary<Keys, string> TestKeys = new Dictionary<Keys, string>();
@@ -291,6 +295,8 @@ public class Config
 		config.KeyDirector = ParseKey(ini.Get("Teclas", "Director"), (Keys)120);
 		config.KeyEditor = ParseKey(ini.Get("Teclas", "Editor"), (Keys)118);
 		config.KeyNextCam = ParseKey(ini.Get("Teclas", "SiguienteCamara"), (Keys)117);
+		config.KeyFollowNpc = ParseKey(ini.Get("Teclas", "SeguirNpc"), Keys.F4);
+		config.UseGameAi = string.Equals(ini.Get("Suscriptor", "IA", "Juego").Trim(), "Juego", StringComparison.OrdinalIgnoreCase);
 		config.KeyReload = ParseKey(ini.Get("Teclas", "Recargar"), (Keys)116);
 		IniSection iniSection4 = ini.Section("TeclasDePrueba");
 		if (iniSection4 != null)

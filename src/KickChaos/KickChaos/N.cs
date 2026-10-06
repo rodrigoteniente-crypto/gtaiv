@@ -288,6 +288,36 @@ public static class N
 		C("SET_ROOM_FOR_CHAR_BY_KEY", ped, (int)key);
 	}
 
+	public static bool IS_CHAR_DUCKING(int ped)
+	{
+		return B("IS_CHAR_DUCKING", ped);
+	}
+
+	public static bool IS_CHAR_GETTING_UP(int ped)
+	{
+		return B("IS_CHAR_GETTING_UP", ped);
+	}
+
+	public static bool IS_PED_RAGDOLL(int ped)
+	{
+		return B("IS_PED_RAGDOLL", ped);
+	}
+
+	public static bool IS_PED_DOING_DRIVEBY(int ped)
+	{
+		return B("IS_PED_DOING_DRIVEBY", ped);
+	}
+
+	public static void SET_CHAR_WILL_ONLY_FIRE_WITH_CLEAR_LOS(int ped, bool v)
+	{
+		C("SET_CHAR_WILL_ONLY_FIRE_WITH_CLEAR_LOS", ped, v);
+	}
+
+	public static void SET_CHAR_DECISION_MAKER_TO_DEFAULT(int ped)
+	{
+		C("SET_CHAR_DECISION_MAKER_TO_DEFAULT", ped);
+	}
+
 	public static void _TASK_COMBAT(int ped, int target)
 	{
 		C("TASK_COMBAT", ped, target);
