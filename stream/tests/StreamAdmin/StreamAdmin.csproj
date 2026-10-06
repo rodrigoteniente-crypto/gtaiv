@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>latest</LangVersion></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../KickChaos/Json.cs" Link="Json.cs" />
+    <Compile Include="../../KickChaos/StreamModels.cs" Link="StreamModels.cs" />
+    <Compile Include="../../KickChaos/StreamWire.cs" Link="StreamWire.cs" />
+  </ItemGroup>
+</Project>

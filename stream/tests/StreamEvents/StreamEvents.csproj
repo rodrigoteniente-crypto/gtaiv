@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);SYSLIB0014</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../KickChaos/DelayedKickEvents.cs" Link="Production/DelayedKickEvents.cs" />
+    <Compile Include="../../KickChaos/KickClient.cs" Link="Production/KickClient.cs" />
+    <Compile Include="../../KickChaos/KickEvent.cs" Link="Production/KickEvent.cs" />
+    <Compile Include="../../KickChaos/KickEventKind.cs" Link="Production/KickEventKind.cs" />
+    <Compile Include="../../KickChaos/TriggerEngine.cs" Link="Production/TriggerEngine.cs" />
+    <Compile Include="../../KickChaos/Config.cs" Link="Production/Config.cs" />
+    <Compile Include="../../KickChaos/Ini.cs" Link="Production/Ini.cs" />
+    <Compile Include="../../KickChaos/ActionNames.cs" Link="Production/ActionNames.cs" />
+    <Compile Include="../../KickChaos/Json.cs" Link="Production/Json.cs" />
+  </ItemGroup>
+</Project>

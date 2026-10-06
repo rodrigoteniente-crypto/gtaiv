@@ -1,0 +1,260 @@
+=====================================================================
+  KickChaos IV 1.9  -  el chat de Kick (rodsquare) controla Liberty City
+  Version para ScriptHookDotNet (GTA IV Complete Edition 1.2.0.59)
+=====================================================================
+
+NOVEDADES 1.9  (todo se prende y apaga: menu > NPC > Prender / apagar cosas, o config.ini)
+  - POLICIA QUE PELEA: la IA de policia del juego no les tira a los NPC (apunta y camina para atras).
+    Ahora: "Policia agresiva" (rafaga, se mueven al costado y para adelante, otra rafaga), "Policia
+    disfrazada" (los del patrullero son personas comunes con ropa de policia, armadas con pistola) y
+    "Se suman los de la calle" (los policias que andan cerca de un tiroteo se meten, aunque no haya
+    estrellas). En log.txt cada 10 s: cuantos policias hay y cuantos tiraron ([poli]).
+  - Se bajan del auto con la puerta abierta y el motor prendido (la radio sigue sonando).
+  - RADIO: antes, al subir el NPC sonaba la radio del celular (la emisora de Esc > Sonido) en vez de la del
+    auto. Ahora por defecto suena la radio de ESE auto, con el efecto de radio del juego (RadioModo = Auto).
+    Se escucha con la camara cerca (la camara que lo sigue esta cerca). RadioModo = Celular: como antes.
+  - Tuneles / bajo tierra: la camara se pega atras del NPC y el jugador escondido queda en la misma
+    "sala" que el NPC (antes se veia el agua desde abajo). Los nombres no se esconden ahi.
+  - Explosivos: no tiran el RPG si hay uno de la banda cerca del objetivo, en el camino o pegado; si la
+    granada/molotov no sale (se quedaba quieto) o el cohete desaparece, explota igual en el objetivo
+    ("Explosion si no sale"). Granadas, molotov y RPG se apagan por separado.
+  - "Se mueven apuntando" apagado por defecto (era lo que a veces los dejaba apuntando al cielo).
+  - Municion limitada (Cargadores = 6): se ve al costado de la barra de vida; sin balas sacan la pistola y
+    despues pelean a las pinas. Niveles y mejoras recargan. Barra azul de chaleco arriba de la de vida.
+  - Mejoras: VELOCIDAD mas suave (+0.05, maximo 1.22, configurable). Nuevas: MUNICION, CADENCIA, VAMPIRO
+    (cada muerte los cura), BOTIQUIN, AUTO BLINDADO. Cada mejora se apaga en [Mejoras] o en el menu.
+  - El nombre arriba del NPC sale con el color que tiene en el chat de Kick (cuando escribe).
+  - Cuando aparece uno (AlAparecer): aparece caminando delante de la camara y a los 5 s la camara lo
+    sigue (o solo en camara, o seguirlo directo). Si la ciudad no termino de cargar, reintenta.
+  - Eventos al azar: CHARLA (un NPC tranquilo se pone a charlar con alguien de la calle) y CARRERA (hasta 4
+    NPC van a lo que mira una de tus camaras, cada uno en un auto, 3-2-1-YA y corren hasta lo que mira otra
+    camara; tregua mientras corren; el que gana +60 s y una mejora). "Probar: carrera ahora" en el menu.
+  - Comandos divertidos del chat: !skin (otra persona, mismo nombre), !ropa, !saltar, !desmayo,
+    !manosarriba, !miedo, !turbo (en auto), !festejar. Los usa el sub con su banda y el chat con la banda en
+    camara (ComandosDivertidos = Chat / Suscriptor / No). Cada uno se apaga en [Divertidos].
+  - Hora real: la hora del juego es la de Windows (menu > Hora, clima y trafico > Hora real).
+  - Mas log: [poli], [evento], [Camara], [estado] (una linea por minuto), explosivos, municion, puertas.
+
+NOVEDADES 1.8
+  - Incluye las correcciones buenas de la 1.6.3 que hiciste con GPT: conexion con Kick mas robusta
+    (se reconecta sola, no cuenta dos veces la misma sub/regalo, ignora mensajes rotos), camaras.ini
+    se guarda seguro (con copia camaras.ini.bak), policias de la calle mejor manejados, rafaga de
+    "recuperacion" si un NPC queda en combate sin tirar, teclas que no se disparan dos veces.
+  - NO incluye de esa version: el cambio que dejaba que Niko (escondido) tenga estrellas, el borrado de
+    autos con gente adentro, ni las persecuciones/arrestos mas lentos.
+  - Opcion nueva: "Regalo: NPC de los que reciben" (menu > NPC > Prender / apagar cosas).
+
+QUE HACE
+  - Esconde a Niko y pone una camara cinematografica con FOV bajo (teleobjetivo)
+    que recorre en loop los lugares de la ciudad que vos elijas, con fundidos.
+    El juego queda como fondo vivo para usar detras tuyo con pantalla verde.
+  - Lee el chat de kick.com/rodsquare (sin cuenta ni token). Cuando alguien se
+    suscribe, regala subs, sigue, te hostea o escribe ciertas palabras, pasan cosas
+    EN EL PLANO QUE SE ESTA VIENDO: explosiones, bombardeo, patrulleros, persecucion
+    con helicopteros, incendios, lluvia de autos, disturbios, tormenta, camara lenta...
+  - NUEVO: cuando alguien se suscribe aparece una persona con SU NOMBRE arriba de la
+    cabeza (y los meses en verde) y la camara la sigue. Segun los meses hace otra cosa.
+  - Escribe "usuario -> ACCION" en un .txt para mostrarlo en OBS.
+
+
+ARCHIVOS (ya instalados)
+  GTAIV\scripts\KickChaos.net.dll          el mod
+  GTAIV\scripts\KickChaos\config.ini       comandos del chat, eventos, cooldowns, teclas...
+  GTAIV\scripts\KickChaos\camaras.ini      tus camaras (se llena solo con el editor)
+  GTAIV\scripts\KickChaos\log.txt          lo que va pasando (conexion, acciones, errores)
+  GTAIV\scripts\KickChaos\ultimo_evento.txt  texto para OBS
+  GTAIV\scripts\KickChaos\ranking.ini      ranking de kills de los subs (sigue de un stream al otro)
+  GTAIV\scripts\KickChaos\ranking.txt      el top 10 para OBS (Fuente de texto > Leer desde archivo)
+
+  Usa el ScriptHookDotNet que ya tenias (aCompleteEditionHook). No hace falta instalar nada mas.
+
+
+QUE EL JUEGO SIGA CORRIENDO (Y SONANDO) DE FONDO
+  GTAIV\KickChaosSonido.asi hace dos cosas cuando haces clic en OBS o en el chat:
+    - el juego sigue sonando (GTA IV usa DirectSound, que lo silencia sin foco), y
+    - el juego no se entera de que perdio el foco: no se frena ni se pausa, sin importar
+      lo que diga FusionFix ("Focus Loss" / BlockOnLostFocus, que a veces se vuelve a 0 solo).
+  Mientras estas en otra ventana el mod no deja que el juego tome el teclado (no se abre la
+  pausa ni el celular aunque escribas en el chat).
+  Se configura en GTAIV\KickChaosSonido.ini (SonidoDeFondo / JuegoSiempreActivo, 1 o 0).
+  Registro: GTAIV\KickChaosSonido.log.  Para sacarlo: borra el .asi.
+
+USO
+  Carga una partida. A los 8 segundos arranca solo el "director" (camara + Niko escondido).
+  Consejo: pone el celular en modo "Dormir" (Opciones del celular) para que no te llamen en vivo.
+
+  MENU:  F8   (flechas arriba/abajo elegir, izquierda/derecha cambiar, ENTER aceptar,
+               RETROCESO volver, SHIFT + izquierda/derecha = cambiar de a 10)
+    Desde el menu se configura TODO y se guarda solo:
+    - Fondo de camaras: prender / apagar, pasar a la siguiente
+    - Escenas y transiciones: duracion de cada escena, fundido o corte directo, zoom, etc.
+    - Mis camaras: duracion, zoom, chance en modo al azar, transicion, hora, clima...
+    - Crear camara nueva (camara libre)
+    - Que pasa con cada evento de Kick (hasta 3 acciones por evento)
+    - NPC de suscriptores (ver abajo)
+    - Comandos y palabras del chat, arreglar la calle, probar acciones, reglas, trafico...
+
+  TECLAS RAPIDAS (se cambian en el menu > Teclas)
+    F8   menu
+    F9   prender / apagar el director
+    F7   camara libre para crear camaras
+    F6   saltar a la siguiente camara
+    F5   recargar config.ini y camaras.ini (si los editaste a mano)
+         (PhotoMode, que tambien se abria con F5, quedo desactivado: el original esta en
+          GTAIV\mods_desactivados\PhotoMode)
+    F4   SEGUIR NPC: la camara se va con un NPC de suscriptor y se queda con el. Apretala otra
+         vez para pasar a otra banda (con una sola banda, al proximo de la banda). Si muere,
+         pasa al siguiente. F6 vuelve a las camaras normales.
+    F3   mostrar / ocultar el RANKING de kills
+    F2   mostrar / ocultar el KILL FEED (quien mato a quien)
+    (las teclas solo funcionan con la ventana del juego activa)
+
+  CAMARA LIBRE (F7 o desde el menu)
+    W A S D mover, Q / E bajar / subir, SHIFT rapido, CTRL lento
+    Mouse (o I J K L) girar,  Z / X zoom (FOV)
+    ENTER          guardar la camara
+    SHIFT + ENTER  guardar donde estas como PUNTO FINAL de la ultima camara (se desliza durante el plano)
+    T              fijar donde van a pasar las explosiones en la ultima camara (marcador rojo)
+    RETROCESO      borrar la ultima camara
+    F7             salir
+
+
+NPC DE SUSCRIPTORES  (menu F8 > NPC de suscriptores)
+  Cuando alguien se suscribe aparece una persona en la vereda de una calle cercana, con su
+  nombre arriba de la cabeza, "NUEVO SUB" o "SUB 6 MESES" en verde, una barra de vida y el
+  tiempo que le queda. La camara se va con el y lo sigue. Mientras este vivo, su camara entra
+  en el sorteo (Chance de su camara). Cuando lo matan, en OBS aparece "usuario -> FUERA DE COMBATE".
+
+  IMPORTANTE: el NPC aparece solo si en el evento (menu > Que pasa con cada evento de Kick)
+  una de las 3 acciones es "NPC con su nombre". "Nada" = no pasa nada en ese lugar.
+  Las otras 2 acciones son extras que pasan al mismo tiempo, cerca de el.
+  (En la pagina del NPC, "Aparece con cada sub" pone o saca eso por vos.)
+
+  DOS MODOS (menu > NPC: "Modo del sub", "Modo del que regala subs", "Modo del follow")
+    Batalla  se busca con las otras bandas, se matan y suben de nivel (y la policia, si esta prendida)
+    Paseo    anda por la ciudad, a pie o en su auto con la radio, y nadie lo puede atacar
+    El sub puede cambiar su NPC escribiendo  !pasear  o  !batalla  en el chat.
+    Todo lo que se prende y apaga esta junto en menu > NPC > "Prender / apagar cosas".
+
+  COMO PELEAN (modo batalla)
+    - Sin nadie cerca se roban un auto y salen a dar vueltas (siempre con la radio prendida);
+      cada tanto se bajan y se roban otro. Manejando se curan solos.
+    - Con "IA del mod" + "Pelea dinamica": rafagas cortas, se mueven apuntando, se cubren detras
+      de autos y paredes, son agresivos o cuidadosos segun la vida y cuantos son, y si no lo ven
+      (hay una pared) buscan otro lugar en vez de tirarle a la pared.
+      Con "IA del juego" el juego hace todo (como antes).
+    - Si la otra banda va en auto la persiguen en auto y se tiran desde las ventanillas.
+      Cada tanto hay una persecucion aleatoria entre dos bandas que van en auto.
+    - Con poca vida escapan en auto y se curan manejando ("Bajan a comprar comida" = como antes).
+
+  ARMAS
+    - Segun los meses (menu > NPC > Armas segun los meses): vos elegis el arma de cada rango.
+    - Segun el nivel (menu > NPC > Armas que ganan por nivel): cada NPC de otra banda que matan
+      sube un nivel (hasta 10) y en cada nivel ganan algo: granadas, molotov, RPG, AK47, M4...
+      Las granadas, molotov y cohetes los tiran de vez en cuando (si lo ven y no hay uno de su banda cerca).
+
+  MEJORAS (ROGUELIKE)
+    Cada vez que matan a alguien aparecen 3 mejoras arriba del NPC:  !1 CHALECO  !2 RPG  !3 VELOCIDAD
+    Elige el sub o el chat (segun "Quien decide"); si nadie elige, sale una al azar.
+    Mejoras: chaleco, +vida, mejor arma, granadas, RPG, molotovs, punteria, velocidad, refuerzo,
+             regeneracion, escudo 20 s, +60 segundos.
+
+  LA BANDA DE ...
+    Cada vez que mata a un policia aparece otro de su banda al lado: "la banda de usuario",
+    hasta 4. Se roban un auto juntos (uno maneja, los otros van atras tirando).
+    Cada muerte le suma 20 segundos a su reloj (se cambia en el menu).
+    Si hay dos bandas, se buscan por todo el mapa para matarse: si estan muy lejos, una
+    aparece cerca de la otra (fuera de camara), como si supieran donde estan.
+    Las camaras prefieren la zona donde esta el lio.
+    - APARECEN LEJOS: si ya hay otra banda cerca, el nuevo aparece en otra de tus camaras, lejos
+      (la camara va para alla). Se buscan manejando y se cruzan en cualquier parte del mapa
+      (si en 100 s no se encontraron, una aparece cerca de la otra, fuera de camara).
+    - RECORREN LA CIUDAD: cuando la banda es de 4, cada tanto se suben a un auto y manejan hasta
+      otra zona (una de tus camaras) buscando a otros para tirotearse.
+    - NIVEL DE BANDA: cada NPC de otra banda que matan les sube un nivel (hasta 10). Aparece en el
+      kill feed ("LA BANDA DE X SUBE A NIVEL 3"), en su cartel ("NV 3") y tiran mejor.
+
+  KILL FEED Y RANKING
+    Arriba a la derecha: quien mato a quien. Los subs en verde, la POLICIA en azul, CIVIL en blanco.
+    Ranking: los 10 subs con mas kills (policias, NPC de otras bandas y civiles), con el nivel.
+    Se guarda en ranking.ini (sigue de un stream al otro) y ranking.txt para OBS.
+    Teclas F2 (feed) y F3 (ranking), o menu > NPC de suscriptores (ahi tambien "Borrar el ranking").
+
+  CAMARA DEL NPC
+    Cuando dispara, la camara se pone atras de el y se ve a quien le tira. Cuando empieza un
+    tiroteo, la camara va ahi y encuadra a todos. Ya no se mete adentro de los edificios.
+    RADIO: si la camara sigue a un NPC en auto, su radio se escucha siempre (aunque este lejos).
+    Es dinamica: cada 5-9 segundos cambia de toma (lo rodea, se acerca bajo, va de costado,
+    se va arriba, se pone de frente). Cuando esta a los tiros prefiere las tomas cerca.
+    En el menu > Camara que lo sigue > "Camara dinamica" se puede apagar (queda la de siempre).
+
+  CONTROL DESDE EL CHAT
+    (!comer ya no existe; ahora esta !bailar: se bajan y se ponen a bailar)
+    Cuando la banda se duplica por primera vez se desbloquea el control: arriba del NPC
+    aparecen 3 ordenes, por ejemplo  !robarauto   !atacar   !huir   (tambien !1 !2 !3).
+    Ordenes posibles: !robarauto, !atacar (va contra la policia), !huir (escapa en auto),
+                      !bailar (se ponen a bailar), !pinas (contra la gente), !banda (busca a la otra banda)
+    Quien decide (menu > NPC > Control desde el chat):
+      Solo el suscriptor   solo el que se suscribio (su orden se cumple al toque)
+      Vota el chat         el primer voto abre una votacion de 15 s; gana la mas votada
+      El chat, el primero  vale la primera orden de cualquiera
+    Tambien se puede activar desde que aparece, o nunca.
+
+  MENSAJES DEL SUB
+    Lo que escribe en el chat el que se suscribio (sin "!") aparece arriba de su personaje
+    unos segundos, como un globito.
+
+  Acciones con el comportamiento fijo (para comandos o eventos): "NPC tiroteo", "NPC roba un
+  auto", "NPC escapa en auto", "NPC arrasa", "NPC a las pinas", "NPC que pasea".
+  Ej: un comando !robo con "NPC roba un auto": el que lo escribe aparece robando un auto.
+
+  Para probar sin subs: menu > NPC > Probar: sub ... (aparece "prueba"). En "Control desde el
+  chat" hay botones para sumar uno a la banda, mandar un mensaje y una orden como si fuera el
+  sub. Con el NPC "prueba", lo que escribas vos en tu chat tambien le llega.
+
+  En el menu del NPC se ve que esta haciendo cada uno y cuantos policias tiene encima.
+  log.txt anota cada patrullero que llega y cada cambio ("se cubre", "se robo un auto", etc.).
+
+
+CHAT Y EVENTOS (config.ini, o desde el menu)
+  [Comandos]   palabra = Accion | quien | cooldown
+      !boom = Explosion
+      !bomba = Bombardeo | sub              (solo subs)
+      sirenas = Policia                     (sin "!" alcanza con que aparezca en el mensaje)
+      apocalipsis = Bombardeo+Terremoto | sub | 120
+  [Eventos]
+      Suscripcion = Npc
+      RegaloSubs  = Npc+Explosion
+      Follow      = Fuego
+      Host        = Persecucion+Bombardeo
+
+  Acciones: Npc, NpcPasear, NpcPelea, NpcHuir, NpcTiroteo, NpcArrasar, NpcRobar,
+            Explosion, Bombardeo, ExplotarCoches, Policia, Persecucion, Bomberos, Fuego,
+            LluviaDeCoches, Disturbio, Panico, Tormenta, Noche, Dia, Atardecer,
+            CamaraLenta, Terremoto, AutosLocos, AutosVoladores, Lluvia, Niebla, SiguienteCamara
+
+  Eventos de Kick (ademas de sub, regalo, follow, host, kicks, ban y cualquier mensaje):
+      PrimerMensaje   alguien escribe por primera vez
+      ChatAFull       el chat explota (X mensajes en Y segundos, se ajusta en el menu)
+      RegaloGrande    regalo de 5+ subs (en vez de RegaloSubs, una sola vez)
+      KicksGrandes    kicks de 100+ (en vez de KicksGifted)
+      RewardRedeemedEvent  recompensa del canal canjeada
+      MensajeFijado, Encuesta
+  Combinar: Bombardeo+Policia     Repetir: Explosion*3
+  El streamer (vos) no tiene cooldown. Subs y regalos siempre disparan.
+  Si Kick agrega un evento nuevo, en log.txt aparece "evento no reconocido 'NOMBRE'":
+  agregalo en [Eventos] como  NOMBRE = Accion.
+
+
+OBS
+  - Fondo: "Captura de juego" (GTAIV.exe) o "Captura de ventana".
+  - Encima, tu camara con filtro "Chroma Key" (verde).
+  - Texto: Fuente de texto > "Leer desde archivo" > GTAIV\scripts\KickChaos\ultimo_evento.txt
+
+
+SI ALGO NO ANDA
+  - scripts\KickChaos\log.txt   y   ScriptHookDotNet.log (en la carpeta del juego)
+  - Menu F8 > Conexion con Kick (estado y cantidad de mensajes).
+  - La camara queda trabada: F9 dos veces (apagar y prender), o F5.
+  - Los NPC escriben en log.txt lo que hacen ("[NPC] aparecio ...", "cayo despues de ...").
+  - Para desinstalar: borra scripts\KickChaos.net.dll y la carpeta scripts\KickChaos.

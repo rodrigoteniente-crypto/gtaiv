@@ -1,0 +1,19 @@
+KickChaos IV 1.9.0 (GTA IV Complete Edition + ScriptHookDotNet)
+
+src/        codigo fuente C# (se compila todo src/*.cs en KickChaos.net.dll)
+build.sh    compila con Roslyn (csc) contra .NET Framework 4.7.2 y ScriptHookDotNet.dll, x86
+test/       pruebas sin juego (harness: config, Kick, reglas, camaras)
+dist/       lo que va en la carpeta del juego:
+              scripts/KickChaos.net.dll
+              scripts/KickChaos/config.ini  (config por defecto)
+              scripts/KickChaos/LEEME.txt   (novedades 1.9 arriba de todo)
+
+Archivos principales:
+  SubNpcManager.cs  NPC de suscriptores: bandas, peleas, policia, autos, radio, mejoras, carteles
+  SubNpcEvents.cs   1.9: eventos al azar (charla, carrera)
+  SubNpcFun.cs      1.9: comandos divertidos del chat (!skin, !saltar, !desmayo...)
+  Director.cs       camaras automaticas, camara que sigue al NPC, tiroteos, tuneles, hora real
+  KickClient.cs     conexion al chat de Kick (Pusher)
+  TriggerEngine.cs  eventos de Kick -> acciones
+  KickMenu.cs       menu dentro del juego
+  N.cs              natives de GTA IV usados

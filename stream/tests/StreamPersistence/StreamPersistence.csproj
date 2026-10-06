@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../KickChaos/Cameras.cs" Link="Production/Cameras.cs" />
+    <Compile Include="../../KickChaos/MathX.cs" Link="Production/MathX.cs" />
+    <Compile Include="../../KickChaos/Config.cs" Link="Production/Config.cs" />
+    <Compile Include="../../KickChaos/Ini.cs" Link="Production/Ini.cs" />
+    <Compile Include="../../KickChaos/ActionNames.cs" Link="Production/ActionNames.cs" />
+    <Compile Include="../../KickChaos/KickEvent.cs" Link="Production/KickEvent.cs" />
+    <Compile Include="../../KickChaos/KickEventKind.cs" Link="Production/KickEventKind.cs" />
+    <Compile Include="../../KickChaos/DelayedKickEvents.cs" Link="Production/DelayedKickEvents.cs" />
+    <Compile Include="../../KickChaos/TriggerEngine.cs" Link="Production/TriggerEngine.cs" />
+    <Compile Include="../../KickChaos/NpcHud.cs" Link="Production/NpcHud.cs" />
+    <Compile Include="../../KickChaos/GangRules.cs" Link="Production/GangRules.cs" />
+    <Compile Include="../StreamEvents/WindowsFormsKeys.cs" Link="WindowsFormsKeys.cs" />
+    <None Include="../../config/config.ini" Link="fixtures/config.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="fixtures/camaras.ini" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

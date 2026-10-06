@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>enable</ImplicitUsings><Nullable>disable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../KickChaos/StreamCameraPolicy.cs" Link="StreamCameraPolicy.cs" />
+    <Compile Include="../../KickChaos/StreamModels.cs" Link="StreamModels.cs" />
+  </ItemGroup>
+</Project>

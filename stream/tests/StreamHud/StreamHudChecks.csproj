@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../KickChaos/StreamModels.cs" Link="StreamModels.cs" />
+    <Compile Include="../../KickChaos/StreamHudPolicy.cs" Link="StreamHudPolicy.cs" />
+    <Compile Include="../../KickChaos/MenuText.cs" Link="MenuText.cs" />
+  </ItemGroup>
+</Project>

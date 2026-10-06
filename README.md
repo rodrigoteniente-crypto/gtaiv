@@ -1,77 +1,90 @@
-# KickChaos IV corregido
+# KickChaos IV 1.9.1 stream
 
-Mod para GTA IV Complete Edition con el **aCompleteEditionHook y ScriptHookDotNet
-de la instalación del usuario**. El código fue recuperado del respaldo
-`KickChaos.net.dll.v161` del RAR proporcionado. El RAR tenía una guía de la versión
-1.7, pero no incluía su DLL principal ni fuentes: esta entrega parte de 1.6.1 y
-se identifica como `1.6.3-community`.
+Mod de GTA IV Complete Edition para el aCompleteEditionHook y ScriptHookDotNet
+proporcionados por el usuario. Reutiliza el código completo del ZIP 1.9.0:
+cámaras/editor/FOV, chat, NPCs, mejoras, ranking, radio y eventos. La versión
+nueva está en `stream/`; `src/` conserva la entrega 1.6.3 para recuperación.
 
-Conserva el director de cámaras, editor con FOV, transiciones, loop, selección
-aleatoria ponderada, suscriptores con nombre y vida, bandas, ranking y comandos
-del chat. Las 33 cámaras del RAR están en `config/original/camaras.ini`.
+## Cambios
 
-## Correcciones
+- Suscriptores sin vencimiento: conservan vida, kills y mejoras hasta morir
+  en la partida. El principal recibe mejores estadísticas que los duplicados.
+  Viewers pueden reclamar un duplicado mediante `!unirme<ID>` y usar su nombre
+  y burbujas de chat. Followers débiles, sin duplicación, pasean y pueden
+  sumarse a una batalla cercana.
+- Builds AGRESIVO, CAZADOR y SUPERVIVIENTE cambian enemigos preferidos, cadencia,
+  puntería, cobertura y huida. Objetivos visibles en el panel. Conserva las
+  elecciones de mejoras y órdenes del chat.
+- Delay configurable de diez segundos para todos los eventos y mensajes de
+  Kick. La prueba de suscripción usa la misma entrada. El NPC aparece antes
+  de pedir cámara; la duración visible comienza después de cargar la toma.
+- Loop de ciudad de 300 segundos. Evalúa NPCs cada 20 segundos, con un 30%
+  de probabilidad, visita de diez segundos y cooldown de 120. Después retorna
+  exactamente al plano anterior con su tiempo restante. F4 fija un NPC, F6
+  vuelve a ciudad. Donaciones de 100 Kicks equivalen a diez segundos, con
+  límites configurables. Cámara de seguimiento con colisión nativa y rechazo
+  de posiciones imposibles bajo puentes/túneles.
+- HUD compacto con stats, builds, cooldown de `!npc`, nuevo suscriptor y feed.
+  F1 oculta el HUD; F2 cambia el feed. Minimapa con cono del FOV, colores por
+  tipo y marcadores de carreras/convoyes.
+- Panel Windows separado: buscar, observar, fijar cámara, rescatar al mismo
+  personaje conservando estadísticas, teletransportar, cambiar build o
+  comportamiento, matar/eliminar y debug. Archivos locales con sesión,
+  respuestas y vencimiento; las acciones se bloquean si el juego no actualiza.
+- Menú F8 en ocho categorías con buscador. Perfil de 32 bandas y 48 personajes;
+  siete bandas de suscriptores independientes y followers con facción común.
+  Las apariciones esperan capacidad sin expulsar a los personajes vivos.
+- Policía y NPCs conservan sus tareas cuando avanzan. Las animaciones de entrar
+  al auto, cobertura y combate tienen margen para completar. Se corrigió la
+  recuperación policial que reiniciaba su contador. La policía ambiental se
+  incorpora a pie: los patrulleros de tránsito siguen con la IA del juego.
+- Combate nativo en vehículos, armas compatibles para ventanillas y salida
+  ante atasco o pistola agotada. Carreras y convoyes ocasionales con autos
+  existentes, cerca de cámaras, sin teletransportar participantes. Conserva
+  viajes compartidos y pasajeros con conductores de otra banda.
 
-- F4 / **Cambiar a cámara de NPC** recorre los NPC vivos y mantiene la selección.
-  F6 vuelve al loop; una nueva suscripción no cambia la cámara manual.
-- Selector **IA de los NPC: Mod / Juego**, guardado desde F8 y aplicado a los
-  personajes vivos. Juego es el valor predeterminado si falta la opción `IA`.
-  Deja el combate, cobertura y decisiones de combate en vehículos al motor;
-  Mod añade recuperación con ráfagas y movimiento dirigido. Ambos mantienen
-  la creación de suscriptores, selección de rivales y recuperación de atascos.
-- Persecuciones con rutas por calles, en lugar del estilo que ignora las calles.
-  Una patrulla que avanza conserva su tarea; los cambios entre objetivos a pie
-  y en auto tienen un margen para completar las animaciones. Se quitó la salida
-  obligatoria a los 25 segundos aunque el sospechoso todavía estuviera lejos.
-- Policía ambiental con un solo supervisor por patrullero, pasajeros que no
-  solicitan detener el auto para bajar y validación del vehículo realmente usado.
-  El director ya no desactiva globalmente la búsqueda policial de la ciudad.
-- Arresto sólo cerca de un sospechoso detenido o rendido. Los corredores se
-  persiguen; se respetan las animaciones de entrar/salir del auto y la cobertura.
-- Combate dirigido al policía o rival elegido, con recuperación si el estado
-  del juego dice combate pero el NPC no avanza ni dispara. Las ráfagas en curso se respetan.
-- Policía ambiental supervisada sólo cerca de una banda; las patrullas del mod
-  tienen un único administrador. Al liberar policías se retiran los cambios locales.
-- Los blancos lejanos no cuentan como visibles sólo porque una native informa
-  detección. La rendición ya no reinicia su propio temporizador cada tick.
-- Guardado atómico de cámaras y respaldo `.bak`, selección de cámaras activas,
-  validación de valores y FOV de 3 a 120 en el editor.
-- Eventos duplicados de Pusher filtrados; los regalos con destinatarios crean
-  NPC con sus nombres. Reconexión con cancelación, límites de cola y teclas con
-  protección frente a repeticiones rápidas.
-- La limpieza no borra patrullas en zonas con NPC activos ni autos protegidos.
+## Instalación
 
-`config/original` conserva la configuración recibida. `config/recommended`
-activa IA Juego, dos patrullas, tiroteo para las primeras categorías y Arrasar para veteranos
-y regalos. Desactiva NPC de follows para reservar los lugares a suscriptores.
-No se aplica este perfil automáticamente sobre la instalación del usuario.
+[Descargar ZIP compilado](https://github.com/rodrigoteniente-crypto/gtaiv/raw/refs/heads/kickchaos-stream-1.9.1/dist/KickChaos-IV-1.9.1-stream.zip).
+Seguir [las instrucciones](docs/STREAM-INSTALACION.md). Incluye la DLL, Numerics,
+el panel y un perfil tranquilo opcional. Conservar `camaras.ini`, `ranking.ini`
+y una copia del config propio antes de aplicar el perfil. No entrega el juego
+ni reemplaza cargadores.
 
-## Instalar y probar
+Las posiciones y FOV guardados se conservan. `UsarDuracionGlobal` aplica los
+300 segundos sin reescribir las duraciones individuales; desactivarlo las respeta.
 
-Ver [las instrucciones de instalación](docs/INSTALACION.md). El paquete compilado
-se genera en `dist/KickChaos-IV-1.6.3.zip` y contiene la DLL, su dependencia y
-los ajustes opcionales. No incluye ni reemplaza el juego ni los cargadores.
+## Validación y límites
 
-La compilación y las regresiones se ejecutan en Linux. **El combate, los NPC,
-la cámara dibujada y los eventos reales de Kick necesitan validación en el juego**.
-La conexión conserva el mecanismo público de Kick/Pusher del mod original;
-cambios futuros de Kick pueden requerir adaptar el cliente.
-La IA Juego usa tareas nativas para los NPC; no convierte a un suscriptor en el
-jugador Niko ni le transfiere automáticamente su sistema de estrellas.
+Compilado x86 para .NET Framework 4.8 contra el ScriptHookDotNet recibido.
+Las suites enlazan producción para políticas de combate/conducción, eventos,
+persistencia de cámaras/ranking, HUD, ritmo ambiental e IPC del panel. Ver
+[resultados y prueba en el juego](docs/STREAM-VALIDACION.md).
 
-## Desarrollar
+Windows/GTA IV no están disponibles en la nube: física, animaciones, combate
+nativo, aspecto de cámaras/HUD y WinForms requieren prueba en el juego. No se
+probó una sesión real de tres horas ni una suscripción pagada de Kick. Se
+conserva Kick/Pusher del mod original; depende de los eventos que emita Kick.
 
-Requiere SDK .NET 8 para herramientas/pruebas y referencias de .NET Framework
-4.8 para compilar el mod. El juego necesita .NET Framework 4.8 en Windows.
+La IA Juego usa tareas nativas, sin transferir automáticamente al NPC todo el
+sistema de búsqueda de Niko. Vida/kills/mejoras del personaje duran durante
+la partida; el ranking se guarda entre sesiones. La API de radio es global:
+`!radio` guarda la elección por NPC y la aplica cuando se lo observa.
+
+## Desarrollo
+
+Requiere SDK .NET 8, Python 3 y la referencia local del hook. El juego y panel
+necesitan .NET Framework 4.8 en Windows. Los cargadores no se distribuyen.
 
 ```bash
-bash tools/build.sh /ruta/ScriptHookDotNet.asi
-bash tools/test.sh
-python3 tools/package.py
+bash tools/build-stream.sh /ruta/ScriptHookDotNet.asi
+bash tools/test-stream.sh
+python3 tools/package-stream.py
 ```
 
-En esta nube la referencia exacta está retenida en
-`/workspace/.onboarding/ScriptHookDotNet.dll`; `bash tools/build.sh` la usa.
-Los scripts de prueba enlazan el código de producción y usan dobles sólo para
-teclado/natives que no se pueden ejecutar fuera del juego. No simulan la física
-ni prueban la IA nativa de GTA IV. El proyecto C# está en `src/KickChaos`.
+En esta nube se puede omitir el argumento: usa
+`/workspace/.onboarding/ScriptHookDotNet.dll`. Los binarios restauran dependencias
+con lockfile. `stream/original/` conserva los textos y config recibidos.
+`stream/tests/LegacyHarness` conserva el harness 1.9.0 como referencia y no se
+contabiliza entre las pruebas nuevas. El ZIP incluye fuentes, guías, licencias
+Numerics y checksums SHA256.
