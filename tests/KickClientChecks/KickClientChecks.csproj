@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);SYSLIB0014</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/KickChaos/KickChaos/Json.cs" Link="Production/Json.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/KickClient.cs" Link="Production/KickClient.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/KickEvent.cs" Link="Production/KickEvent.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/KickEventKind.cs" Link="Production/KickEventKind.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/TriggerEngine.cs" Link="Production/TriggerEngine.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/ActionQueue.cs" Link="Production/ActionQueue.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/ActionNames.cs" Link="Production/ActionNames.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/ActionStep.cs" Link="Production/ActionStep.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/ChatTrigger.cs" Link="Production/ChatTrigger.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/PendingAction.cs" Link="Production/PendingAction.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/QueuedAction.cs" Link="Production/QueuedAction.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/Config.cs" Link="Production/Config.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/IniFile.cs" Link="Production/IniFile.cs" />
+    <Compile Include="../../src/KickChaos/KickChaos/IniSection.cs" Link="Production/IniSection.cs" />
+  </ItemGroup>
+</Project>

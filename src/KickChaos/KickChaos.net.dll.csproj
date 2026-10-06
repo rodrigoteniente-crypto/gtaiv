@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>KickChaos.net</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <LangVersion>12.0</LangVersion>
+    <PlatformTarget>x86</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ScriptHookPath Condition="'$(ScriptHookPath)' == ''">$(MSBuildThisFileDirectory)../../lib/ScriptHookDotNet.dll</ScriptHookPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="ScriptHookDotNet"><HintPath>$(ScriptHookPath)</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="CheckScriptHook" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(ScriptHookPath)')" Text="Indica -p:ScriptHookPath=RUTA/ScriptHookDotNet.dll con la DLL de tu instalación de aCompleteEditionHook." />
+  </Target>
+</Project>
